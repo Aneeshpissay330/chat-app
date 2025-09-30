@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "887990739707",
+    "project_id": "chat-app-e1129",
+    "storage_bucket": "chat-app-e1129.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:887990739707:android:e0c58e6aee62d64c78865e",
+        "android_client_info": {
+          "package_name": "com.aneesh.chatapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "887990739707-1f30fpe6fuc1br4ji7rrq7q71d8mq2h2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aneesh.chatapp",
+            "certificate_hash": "6aac4f7c99c30e0f6fbe93f54b01eee32fb0ee09"
+          }
+        },
+        {
+          "client_id": "887990739707-smt63p2r48pbj16ud0o8fjsgcq20kghv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aneesh.chatapp",
+            "certificate_hash": "31e2f64283c7cde286cfc941288a8b38e0efb738"
+          }
+        },
+        {
+          "client_id": "887990739707-stk01khp9kks417j9i3htbahaekul5ug.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6qAKV5qYHUjosOBVQr1N8xKat-IaGWrA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "887990739707-stk01khp9kks417j9i3htbahaekul5ug.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
