@@ -74,3 +74,5 @@ yarn-error.log
 
 *.apk
 *.aab
+# react-native-config codegen
+ios/tmp.xcconfig
