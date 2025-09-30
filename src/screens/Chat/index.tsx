@@ -1,11 +1,16 @@
-import { View, Text } from 'react-native';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import React from 'react';
+import Group from './Group';
+import Personal from './Personal';
+
+const Tab = createMaterialTopTabNavigator();
 
 const Chat = () => {
   return (
-    <View>
-      <Text>Chat</Text>
-    </View>
+    <Tab.Navigator>
+      <Tab.Screen name="Personal" component={Personal} />
+      <Tab.Screen name="Group" component={Group} />
+    </Tab.Navigator>
   );
 };
 
