@@ -11,8 +11,8 @@ type Props = {
 const ModeSwitcher: React.FC<Props> = ({ mode, onChangeMode }) => {
   const buttons = useMemo(
     () => [
-      { value: 'photo', label: 'Photo' },
-      { value: 'video', label: 'Video' },
+      { value: 'photo', label: 'Photo', uncheckedColor: '#FFFFFF' },
+      { value: 'video', label: 'Video', uncheckedColor: '#FFFFFF' },
     ],
     []
   );
