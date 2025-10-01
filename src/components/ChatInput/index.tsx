@@ -60,7 +60,7 @@ export default function ChatInput({
         placeholder="Type a message"
         value={text}
         onChangeText={setText}
-        multiline
+        // multiline
         numberOfLines={1}
         dense
         activeUnderlineColor="transparent"

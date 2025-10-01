@@ -32,3 +32,7 @@ export const googleSignIn = async () => {
     return { error: 'An unknown error occurred during Google Sign-In.' };
   }
 };
+
+export async function signOutGoogle(): Promise<void> {
+  try { await GoogleSignin.signOut(); } catch {}
+}

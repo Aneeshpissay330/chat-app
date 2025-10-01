@@ -27,6 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useKeyboardStatus } from '../../../hooks/useKeyboardStatus';
 import ImagePicker from 'react-native-image-crop-picker';
+import { pick } from '@react-native-documents/picker';
 
 const ME = 'me-uid';
 
@@ -96,23 +97,30 @@ export default function ChatView() {
     listRef.current?.scrollToOffset({ animated: true, offset: 0 });
   }, []);
 
-  const onPickDocument = useCallback(() => {
+  const onPickDocument = useCallback(async () => {
     // TODO: integrate react-native-document-picker
-    console.log('Pick Document');
-  }, []);
-  const onOpenCamera = useCallback(async () => {
-    // TODO: integrate react-native-image-picker (launchCamera)
-    // navigation.navigate('Camera');
     try {
-      const result = await ImagePicker.openCamera({
-        width: 300,
-        height: 400,
-        cropping: true,
+      const [result] = await pick({
+        mode: 'open',
       });
       console.log(result);
     } catch (error) {
-      console.log('Camera error or cancelled', error);
+      console.log('Document picker error or cancelled', error);
     }
+  }, []);
+  const onOpenCamera = useCallback(async () => {
+    // TODO: integrate react-native-image-picker (launchCamera)
+    navigation.navigate('CameraScreen');
+    // try {
+    //   const result = await ImagePicker.openCamera({
+    //     width: 300,
+    //     height: 400,
+    //     cropping: true,
+    //   });
+    //   console.log(result);
+    // } catch (error) {
+    //   console.log('Camera error or cancelled', error);
+    // }
   }, []);
   const onOpenGallery = useCallback(async () => {
     // TODO: integrate react-native-image-picker (launchImageLibrary)
