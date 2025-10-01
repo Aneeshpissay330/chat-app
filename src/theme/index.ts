@@ -60,7 +60,11 @@ const fonts = configureFonts({
 });
 
 export const colors = {
-  background: "#FFFFFF",
+  background: "#F5F7FA",
+  primary: '#4B6CFF',
+  primaryVariant: '#3A8DFF',
+  secondary: '#9C42FF',
+  secondaryVariant: '#C56FFF',
 };
 
 export const theme: ThemeProp = {
@@ -69,5 +73,20 @@ export const theme: ThemeProp = {
   colors: {
     ...MD3LightTheme.colors,
     background: colors.background,
+    primary: colors.primary,
+    onPrimary: '#FFFFFF',
+    primaryContainer: colors.primaryVariant,
+    onPrimaryContainer: '#FFFFFF',
+    secondary: colors.secondary,
+    onSecondary: '#FFFFFF',
+    secondaryContainer: colors.secondaryVariant,
+    onSecondaryContainer: '#FFFFFF',
+    // You should also override neutrals / background / surface etc.
+    onBackground: '#121212',     // text on background
+    surface: '#FFFFFF',
+    onSurface: '#1E1E1E',
+    surfaceVariant: '#E0E0E0',
+    onSurfaceVariant: '#444444',
+    outline: '#B0B0B0',
   },
 };

@@ -2,6 +2,7 @@ import * as React from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BottomNavigation } from 'react-native-paper';
+import { theme } from '../../theme';
 
 export default function PaperBottomTabBar({
   state,
@@ -13,6 +14,9 @@ export default function PaperBottomTabBar({
     <BottomNavigation.Bar
       navigationState={state}
       safeAreaInsets={insets}
+      style={{
+        backgroundColor: theme.colors?.background,
+      }}
       onTabPress={({ route, preventDefault }) => {
         const event = navigation.emit({
           type: 'tabPress',

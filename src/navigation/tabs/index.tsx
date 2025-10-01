@@ -5,6 +5,7 @@ import MaterialCommunityIcons from '@react-native-vector-icons/material-design-i
 import PaperBottomTabBar from './PaperBottomTabBar';
 import Chat from '../../screens/Chat';
 import Settings from '../../screens/Settings';
+import { colors } from '../../theme';
 
 export type RootTabParamList = {
   Chat: undefined;
@@ -17,7 +18,8 @@ export default function Tabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        animation: 'shift'
+        animation: 'shift',
+        headerStyle: { elevation: 0, shadowOpacity: 0, }
       }}
       tabBar={(props) => <PaperBottomTabBar {...props} />}
     >
