@@ -1,9 +1,19 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Dimensions, PermissionsAndroid, Platform } from 'react-native';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import type {
   Include,
   PhotoIdentifier,
 } from '@react-native-camera-roll/camera-roll';
+
+export const SPACING = 8;
+export const NUM_COLUMNS = 3;
+export const SCREEN_WIDTH = Dimensions.get('window').width;
+export const ITEM_SIZE = useMemoItemSize();
+
+export function useMemoItemSize() {
+  const w = SCREEN_WIDTH - (SPACING * (NUM_COLUMNS + 1));
+  return Math.floor(w / NUM_COLUMNS);
+}
 
 /**
  * Check or request necessary permissions for accessing media on Android.

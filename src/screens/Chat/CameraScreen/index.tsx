@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
@@ -18,10 +18,14 @@ import { useTorch } from '../../../hooks/useTorch';
 import { Mode } from '../../../types/camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+export type RootTabParamList = {
+  Gallery: undefined;
+};
+
 const CameraScreen: React.FC = () => {
   const [position, setPosition] = useState<'back' | 'front'>('back');
   const [mode, setMode] = useState<Mode>('photo');
-
+  const navigation = useNavigation<NavigationProp<RootTabParamList>>();
   const device = useCameraDevice(position);
   const isActive = useCameraLifecycle();
   const { hasCam } = useCameraPermissions(mode);
@@ -53,6 +57,7 @@ const CameraScreen: React.FC = () => {
 
   const onPressGallery = useCallback(() => {
     // TODO: open gallery picker or navigate to gallery
+    navigation.navigate("Gallery");
   }, []);
 
   const onPressSwitchCamera = useCallback(() => {
