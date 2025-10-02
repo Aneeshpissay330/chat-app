@@ -1,8 +1,8 @@
-import { StyleSheet } from "react-native";
-import { SPACING } from "../../../utils/camera-roll";
+import { StyleSheet } from 'react-native';
+import { SPACING } from '../../../utils/camera-roll';
 
 export const styles = StyleSheet.create({
-     listContent: {
+  listContent: {
     padding: SPACING,
     paddingBottom: SPACING * 2,
   },

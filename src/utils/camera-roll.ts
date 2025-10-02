@@ -11,7 +11,7 @@ export const SCREEN_WIDTH = Dimensions.get('window').width;
 export const ITEM_SIZE = useMemoItemSize();
 
 export function useMemoItemSize() {
-  const w = SCREEN_WIDTH - (SPACING * (NUM_COLUMNS + 1));
+  const w = SCREEN_WIDTH - SPACING * (NUM_COLUMNS + 1);
   return Math.floor(w / NUM_COLUMNS);
 }
 
@@ -78,8 +78,8 @@ export type MinimalPhoto = {
   id: string;
   url: string;
   filename: string;
-  size: number;      // bytes
-  album: string;     // album title this photo belongs to
+  size: number; // bytes
+  album: string; // album title this photo belongs to
 };
 
 /** Grouped return type */
@@ -88,16 +88,12 @@ export type AlbumWithPhotos = {
   photos: MinimalPhoto[];
 };
 
-function toMinimal(
-  edge: PhotoIdentifier,
-  albumTitle: string
-): MinimalPhoto {
+function toMinimal(edge: PhotoIdentifier, albumTitle: string): MinimalPhoto {
   const { node } = edge;
   const url = node.image?.uri ?? '';
   const id = node.id; // prefer assetId if present
-  const size = (node as any).image.fileSize ?? 0;  // fileSize is present when requested via include
-  const filename =
-    (node as any).image.filename;
+  const size = (node as any).image.fileSize ?? 0; // fileSize is present when requested via include
+  const filename = (node as any).image.filename;
 
   return { id, url, filename, size, album: albumTitle };
 }
@@ -120,22 +116,24 @@ export async function getAlbumsGroupedMinimal(options?: {
   const albums = await CameraRoll.getAlbums({ assetType });
 
   const grouped: AlbumWithPhotos[] = await Promise.all(
-    albums.map(async (album) => {
+    albums.map(async album => {
       const res = await CameraRoll.getPhotos({
         first: perAlbum,
         assetType,
         groupName: album.title,
-        groupTypes: 'Album',     // iOS uses this; Android ignores
-        include: MIN_INCLUDE,    // only fetch what we need
+        groupTypes: 'Album', // iOS uses this; Android ignores
+        include: MIN_INCLUDE, // only fetch what we need
       });
 
-      const photos = res.edges.map((e) => toMinimal(e as PhotoIdentifier, album.title));
+      const photos = res.edges.map(e =>
+        toMinimal(e as PhotoIdentifier, album.title),
+      );
 
       return {
         album: { title: album.title, count: album.count },
         photos,
       };
-    })
+    }),
   );
 
   // Optional: sort by album size descending
@@ -145,5 +143,5 @@ export async function getAlbumsGroupedMinimal(options?: {
 
 /** If you ever need a single flat list instead of grouped */
 export function flattenMinimal(grouped: AlbumWithPhotos[]): MinimalPhoto[] {
-  return grouped.flatMap((g) => g.photos);
+  return grouped.flatMap(g => g.photos);
 }

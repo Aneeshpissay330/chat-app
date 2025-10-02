@@ -9,8 +9,4 @@ export const styles = StyleSheet.create({
   gridContainer: {
     paddingHorizontal: 0,
   },
-  columnWrapper: {
-    gap: SPACING,
-    marginBottom: SPACING,
-  },
 });
