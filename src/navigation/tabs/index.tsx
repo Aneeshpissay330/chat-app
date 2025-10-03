@@ -6,6 +6,7 @@ import PaperBottomTabBar from './PaperBottomTabBar';
 import Chat from '../../screens/Chat';
 import Settings from '../../screens/Settings';
 import { colors } from '../../theme';
+import { useTheme } from 'react-native-paper';
 
 export type RootTabParamList = {
   Chat: undefined;
@@ -15,11 +16,13 @@ export type RootTabParamList = {
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export default function Tabs() {
+  const theme = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         animation: 'shift',
-        headerStyle: { elevation: 0, shadowOpacity: 0, }
+        headerStyle: { elevation: 0, shadowOpacity: 0, backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.onBackground
       }}
       tabBar={(props) => <PaperBottomTabBar {...props} />}
     >

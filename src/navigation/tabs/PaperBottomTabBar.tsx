@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BottomNavigation } from 'react-native-paper';
-import { theme } from '../../theme';
+import { BottomNavigation, useTheme } from 'react-native-paper';
 
 export default function PaperBottomTabBar({
   state,
@@ -10,6 +9,7 @@ export default function PaperBottomTabBar({
   navigation,
   insets,
 }: BottomTabBarProps) {
+  const theme = useTheme();
   return (
     <BottomNavigation.Bar
       navigationState={state}

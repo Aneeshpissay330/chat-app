@@ -1,21 +1,20 @@
-// components/ChatItem.tsx
 import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
 import React from 'react';
 import {
-    GestureResponderEvent,
-    Image,
-    Pressable,
-    StyleSheet,
-    View,
+  GestureResponderEvent,
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
 } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Divider, Text, useTheme } from 'react-native-paper';
 import { formatChatDate } from '../../utils/date';
 
 type ChatItemProps = {
   name: string;
   avatar: string;
   lastMessage: string;
-  date: string; // ⬅️ changed from time to date
+  date: string;
   unreadCount: number;
   pinned?: boolean;
   online?: boolean;
@@ -32,49 +31,77 @@ export default function ChatItem({
   online = false,
   onPress,
 }: ChatItemProps) {
+  const theme = useTheme();
+
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.container,
-        pressed && { backgroundColor: '#f2f2f2' },
-      ]}
-      onPress={onPress}
-    >
-      <View style={styles.avatarWrapper}>
-        <Image source={{ uri: avatar }} style={styles.avatar} />
-        {online && <View style={styles.presenceDot} />}
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text numberOfLines={1} style={styles.name}>
-            {name}
-          </Text>
-          <View style={styles.timeRow}>
-            {pinned && (
-              <MaterialCommunityIcons
-                name="pin"
-                color="#6200ee"
-                size={12}
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <Text style={styles.date}>{formatChatDate(date)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text numberOfLines={1} style={styles.message}>
-            {lastMessage}
-          </Text>
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{unreadCount}</Text>
-            </View>
+    <>
+      <Pressable
+        style={({ pressed }) => [
+          styles.container,
+          { backgroundColor: theme.colors.surface },
+          pressed && { backgroundColor: theme.colors.surfaceVariant },
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.avatarWrapper}>
+          <Image source={{ uri: avatar }} style={styles.avatar} />
+          {online && (
+            <View
+              style={[
+                styles.presenceDot,
+                { borderColor: theme.colors.surface },
+              ]}
+            />
           )}
         </View>
-      </View>
-    </Pressable>
+
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text
+              numberOfLines={1}
+              style={[styles.name, { color: theme.colors.onSurface }]}
+            >
+              {name}
+            </Text>
+            <View style={styles.timeRow}>
+              {pinned && (
+                <MaterialCommunityIcons
+                  name="pin"
+                  color={theme.colors.primary}
+                  size={12}
+                  style={{ marginRight: 4 }}
+                />
+              )}
+              <Text style={[styles.date, { color: theme.colors.outline }]}>
+                {formatChatDate(date)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.footer}>
+            <Text
+              numberOfLines={1}
+              style={[styles.message, { color: theme.colors.onSurfaceVariant }]}
+            >
+              {lastMessage}
+            </Text>
+            {unreadCount > 0 && (
+              <View
+                style={[
+                  styles.unreadBadge,
+                  { backgroundColor: theme.colors.primary },
+                ]}
+              >
+                <Text style={styles.unreadText}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Pressable>
+
+      {/* Paper Divider below the item */}
+      <Divider />
+    </>
   );
 }
 
@@ -84,9 +111,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#e6e6e6',
-    backgroundColor: '#fff',
   },
   avatarWrapper: {
     position: 'relative',
@@ -107,7 +131,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#fff',
   },
   content: {
     flex: 1,
@@ -122,7 +145,6 @@ const styles = StyleSheet.create({
   name: {
     fontWeight: '600',
     fontSize: 16,
-    color: '#333',
     flex: 1,
   },
   timeRow: {
@@ -131,7 +153,6 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 12,
-    color: '#999',
   },
   footer: {
     flexDirection: 'row',
@@ -141,10 +162,8 @@ const styles = StyleSheet.create({
   message: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
   },
   unreadBadge: {
-    backgroundColor: '#6200ee',
     width: 20,
     height: 20,
     borderRadius: 10,

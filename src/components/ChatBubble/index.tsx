@@ -8,13 +8,31 @@ type Props = {
   message: Message;
   isMe: boolean;
   showAvatar?: boolean;
+  showName?: boolean; // show sender name (use for group chats on non-me messages)
 };
 
-export default function ChatBubble({ message, isMe, showAvatar = !isMe }: Props) {
+export default function ChatBubble({
+  message,
+  isMe,
+  showAvatar = !isMe,
+  showName = false,
+}: Props) {
   const theme = useTheme();
-  const bubbleBg = isMe ? theme.colors.primary : (theme.dark ? theme.colors.surface : '#fff');
-  const textColor = isMe ? '#fff' : (theme.dark ? theme.colors.onSurface : '#1f2937');
+
+  const bubbleBg = isMe
+    ? theme.colors.primary
+    : theme.dark
+    ? theme.colors.surface
+    : '#fff';
+
+  const textColor = isMe
+    ? '#fff'
+    : theme.dark
+    ? theme.colors.onSurface
+    : '#1f2937';
+
   const borderColor = theme.dark ? '#4b5563' : '#e5e7eb';
+  const nameColor = isMe ? 'rgba(255,255,255,0.85)' : '#6b7280';
 
   return (
     <View style={[styles.row, { justifyContent: isMe ? 'flex-end' : 'flex-start' }]}>
@@ -39,11 +57,23 @@ export default function ChatBubble({ message, isMe, showAvatar = !isMe }: Props)
             },
           ]}
         >
+          {/* Sender name (group chats) */}
+          {showName && message.userName ? (
+            <Text variant="labelSmall" style={{ marginBottom: 2, color: nameColor }}>
+              {message.userName}
+            </Text>
+          ) : null}
+
+          {/* File attachment header */}
           {message.fileName ? (
             <View style={{ marginBottom: message.text ? 8 : 0 }}>
               <View style={styles.fileRow}>
                 <View style={styles.fileIconWrap}>
-                  <Icon source={fileIconFor(message.fileType)} size={20} color={isMe ? '#fff' : theme.colors.primary} />
+                  <Icon
+                    source={fileIconFor(message.fileType)}
+                    size={20}
+                    color={isMe ? '#fff' : theme.colors.primary}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyMedium" style={{ color: textColor, fontWeight: '600' }}>
@@ -59,17 +89,23 @@ export default function ChatBubble({ message, isMe, showAvatar = !isMe }: Props)
             </View>
           ) : null}
 
+          {/* Message text */}
           {message.text ? (
             <Text variant="bodyMedium" style={{ color: textColor }}>
               {message.text}
             </Text>
           ) : null}
 
+          {/* Meta row (timestamp + ticks) */}
           <View style={[styles.metaRow, { justifyContent: 'flex-end' }]}>
             <Text variant="labelSmall" style={{ color: isMe ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>
               {formatChatDate(message.createdAt)}
             </Text>
-            {isMe ? <View style={{ marginLeft: 4 }}><Icon source="check-all" size={14} color="rgba(255,255,255,0.8)" /></View> : null}
+            {isMe ? (
+              <View style={{ marginLeft: 4 }}>
+                <Icon source="check-all" size={14} color="rgba(255,255,255,0.8)" />
+              </View>
+            ) : null}
           </View>
         </View>
       </View>

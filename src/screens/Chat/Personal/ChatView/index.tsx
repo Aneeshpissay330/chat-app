@@ -18,14 +18,14 @@ import {
   Dimensions,
 } from 'react-native';
 import { Appbar, Avatar, List, useTheme } from 'react-native-paper';
-import ChatBubble from '../../../components/ChatBubble';
-import ChatInput from '../../../components/ChatInput';
-import type { Message, SendPayload } from '../../../types/chat';
+import ChatBubble from '../../../../components/ChatBubble';
+import ChatInput from '../../../../components/ChatInput';
+import type { Message, SendPayload } from '../../../../types/chat';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useKeyboardStatus } from '../../../hooks/useKeyboardStatus';
+import { useKeyboardStatus } from '../../../../hooks/useKeyboardStatus';
 import ImagePicker from 'react-native-image-crop-picker';
 import { pick } from '@react-native-documents/picker';
 
@@ -67,9 +67,21 @@ const initialMessages: Message[] = [
   },
 ];
 
+type ChatRouteParams = {
+  ChatView: { id: string; type?: 'group' };
+};
+
+type ChatPersonalNavigationParams = {
+  CameraScreen: undefined;
+  PersonalChatContact: undefined;
+};
+
+
 export default function ChatView() {
+  const route = useRoute<RouteProp<ChatRouteParams, 'ChatView'>>();
+  const isGroup = route.params?.type === 'group';
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<ChatPersonalNavigationParams>>();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const listRef = useRef<FlatList<Message>>(null);
   const isKeyboardOpen = useKeyboardStatus();
@@ -78,7 +90,14 @@ export default function ChatView() {
       const isMe = item.userId === ME;
       const prev = messages[index + 1]; // inverted list
       const showAvatar = !isMe && (!prev || prev.userId !== item.userId);
-      return <ChatBubble message={item} isMe={isMe} showAvatar={showAvatar} />;
+      return (
+        <ChatBubble
+          message={item}
+          isMe={isMe}
+          showAvatar={showAvatar}
+          showName={isGroup && !isMe}
+        />
+      );
     },
     [messages],
   );
@@ -149,7 +168,7 @@ export default function ChatView() {
           title="Sarah Johnson"
           description="Online"
           left={props => <List.Icon {...props} icon="folder" />}
-          onPress={() => {}}
+          onPress={() => navigation.navigate('PersonalChatContact')}
         />
       ),
       headerRight: () => (

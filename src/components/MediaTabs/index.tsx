@@ -1,12 +1,14 @@
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import React from 'react';
 import { useTheme } from 'react-native-paper';
-import Group from './Group';
-import Personal from './Personal';
+import StarredTab from './StarredTab';
+import MediaTab from './MediaTab';
+import DocsTab from './DocsTab';
+import LinksTab from './LinksTab';
 
 const Tab = createMaterialTopTabNavigator();
 
-const Chat = () => {
+const MediaTabs = () => {
   const theme = useTheme(); // Paper theme
 
   return (
@@ -17,10 +19,12 @@ const Chat = () => {
         sceneStyle: { backgroundColor: theme.colors.background }, // ✅ fix here
       }}
     >
-      <Tab.Screen name="Personal" component={Personal} />
-      <Tab.Screen name="Group" component={Group} />
+      <Tab.Screen name="Starred" component={StarredTab} />
+      <Tab.Screen name="Media" component={MediaTab} />
+      <Tab.Screen name="Docs" component={DocsTab} />
+      <Tab.Screen name="Links" component={LinksTab} />
     </Tab.Navigator>
   );
 };
 
-export default Chat;
+export default MediaTabs;
