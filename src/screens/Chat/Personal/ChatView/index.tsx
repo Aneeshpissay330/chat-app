@@ -22,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
-import { Appbar, Avatar, List, useTheme } from 'react-native-paper';
+import { Appbar, Avatar, IconButton, List, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../../../components/ChatBubble';
 import ChatInput from '../../../../components/ChatInput';
@@ -43,6 +43,7 @@ import {
   sendImage,
   sendVideo,
 } from '../../../../services/chat'; // <-- add this file from previous step
+import { colors } from '../../../../theme';
 
 type ChatRouteParams = {
   ChatView: { id: string; type?: 'group'; name?: string; avatar?: string };
@@ -222,9 +223,9 @@ export default function ChatView() {
           }}
         />
       ),
-      headerRight: () => (
-        <Appbar.Action icon="dots-vertical" onPress={() => {}} />
-      ),
+      // headerRight: () => (
+      //   <Appbar.Action icon="dots-vertical" onPress={() => {}} />
+      // ),
     });
   }, [navigation, displayName, presenceText, isSelf, meDoc?.username]);
 
@@ -324,15 +325,25 @@ export default function ChatView() {
               renderItem={renderItem}
               contentContainerStyle={{ paddingVertical: 8 }}
               keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
+              maintainVisibleContentPosition={{
+                minIndexForVisible: 0,
+                autoscrollToTopThreshold: 10,
+              }}
             />
-            <ChatInput
+            <View style={{ justifyContent: 'space-between', columnGap: 8 ,flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4}}>
+              <IconButton icon="trash-can-outline" />
+              <IconButton icon="microphone-outline" iconColor="red" size={30} />
+              <IconButton icon="send-circle" iconColor={colors.primary} size={45} />
+            </View>
+            {/* <ChatInput
               onSend={onSend}
               onPickDocument={onPickDocument}
               onOpenCamera={onOpenCamera}
               onOpenGallery={onOpenGallery}
               onRecordAudio={onRecordAudio}
               onTyping={onTyping} // if you expose this prop from ChatInput
-            />
+            /> */}
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>

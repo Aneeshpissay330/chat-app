@@ -112,6 +112,7 @@ export default function ChatInput({
           onPress={onRecordAudio}
         />
       )}
+      {/* <IconButton icon="send" disabled={text.trim().length > 0 ? false : true} mode="contained-tonal" onPress={handleSend} /> */}
 
       {/* Attachment Sheet */}
       <AttachmentSheet

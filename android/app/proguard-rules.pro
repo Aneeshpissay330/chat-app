@@ -8,9 +8,10 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
-#-keep class org.webrtc.** { *; }
-#-keep class com.rt2zz.reactnativecontacts.** {*;}
-#-keepclassmembers class com.rt2zz.reactnativecontacts.** {*;}
+-keep class org.webrtc.** { *; }
+-keep class com.rt2zz.reactnativecontacts.** {*;}
+-keepclassmembers class com.rt2zz.reactnativecontacts.** {*;}
+-keep class com.shopify.reactnative.skia.** { *; }
 #-keep public class com.dylanvann.fastimage.* {*;}
 #-keep public class com.dylanvann.fastimage.** {*;}
 #-keep public class * implements com..glide.module.GlideModule

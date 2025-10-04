@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@craftzdog/react-native-buffer": "^6.1.1",
     "@gorhom/bottom-sheet": "^5.2.6",
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^1.24.0",
@@ -41,6 +42,7 @@
     "@reduxjs/toolkit": "^2.9.0",
     "@robinbobin/react-native-google-drive-api-wrapper": "^2.2.4",
     "@shopify/flash-list": "^2.1.0",
+    "@shopify/react-native-skia": "^2.3.0",
     "@stream-io/react-native-webrtc": "^125.4.4",
     "@stream-io/video-react-native-sdk": "^1.21.1",
     "react": "19.1.0",
@@ -48,6 +50,7 @@
     "react-native-audio-api": "^0.8.2",
     "react-native-contacts": "^8.0.7",
     "react-native-emoji-popup": "^0.3.3",
+    "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "^2.28.0",
     "react-native-image-crop-picker": "^0.51.0",
     "react-native-incall-manager": "^4.2.1",
@@ -55,6 +58,7 @@
     "react-native-pager-view": "^6.9.1",
     "react-native-paper": "^5.14.5",
     "react-native-permissions": "^5.4.2",
+    "react-native-quick-base64": "^2.2.2",
     "react-native-reanimated": "^4.1.2",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.16.0",
