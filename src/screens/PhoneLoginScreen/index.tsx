@@ -1,6 +1,6 @@
 // screens/PhoneLoginScreen.tsx
 import React, { useState } from 'react';
-import { Dimensions, Image, useColorScheme, View } from 'react-native';
+import { Dimensions, Image, KeyboardAvoidingView, useColorScheme, View } from 'react-native';
 import {
   Button,
   Card,
@@ -47,13 +47,14 @@ export default function PhoneLoginScreen() {
   };
 
   return (
-    <View
+    <KeyboardAvoidingView
       style={{
         flex: 1,
         padding: 20,
         justifyContent: 'center',
         backgroundColor: theme.colors.background,
       }}
+      behavior='padding'
     >
       <Image
         source={isDark ? require('../../assets/images/dark-illustration.png') : require('../../assets/images/light-illustration.png')}
@@ -139,6 +140,6 @@ export default function PhoneLoginScreen() {
       >
         {error || snack.message}
       </Snackbar>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

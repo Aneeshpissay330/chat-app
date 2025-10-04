@@ -18,7 +18,7 @@ const resolveDisplayName = (firebaseUser: FirebaseAuthTypes.User | null) => {
   const fromAuth = normalizeName(firebaseUser.displayName);
 
   const googleProvider = firebaseUser.providerData.find(
-    p => p.providerId === 'google.com'
+    p => p.providerId === 'google.com',
   );
 
   const fromProvider = normalizeName(googleProvider?.displayName);
@@ -33,27 +33,45 @@ export function useFirebaseAuth() {
   useEffect(() => {
     const auth = getAuth();
 
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async firebaseUser => {
       setUser(firebaseUser);
 
       if (firebaseUser) {
         const displayName = resolveDisplayName(firebaseUser);
 
         const ref = firestore().collection('users').doc(firebaseUser.uid);
-        await ref.set(
-          {
-            uid: firebaseUser.uid,
-            phoneNumber: firebaseUser.phoneNumber ?? null,
-            email: firebaseUser.email ?? null,
-            displayName,                       // <- unified, normalized
-            photoURL: firebaseUser.photoURL ?? null,
-            providers: firebaseUser.providerData.map(p => p.providerId),
-            searchablePhones: firebaseUser.phoneNumber ? [firebaseUser.phoneNumber] : [],
-            updatedAt: firestore.FieldValue.serverTimestamp(),
-            createdAt: firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
+        4;
+        const googleProvider = firebaseUser.providerData.find(
+          p => p.providerId === 'google.com',
         );
+        const existingDoc = await ref.get();
+        if (!existingDoc.exists) {
+          await ref.set(
+            {
+              uid: firebaseUser.uid,
+              phoneNumber: firebaseUser.phoneNumber ?? null,
+              email: firebaseUser.email ?? null,
+              displayName, // <- unified, normalized
+              photoURL: googleProvider?.photoURL ?? null,
+              providers: firebaseUser.providerData.map(p => p.providerId),
+              searchablePhones: firebaseUser.phoneNumber
+                ? [firebaseUser.phoneNumber]
+                : [],
+              updatedAt: firestore.FieldValue.serverTimestamp(),
+              createdAt: firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        } else {
+          // Just update metadata fields like `updatedAt`, providers etc., not user content
+          await ref.set(
+            {
+              providers: firebaseUser.providerData.map(p => p.providerId),
+              updatedAt: firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
 
         // Move FCM registration here so it always runs when auth is ready
         const uid = firebaseUser.uid;
