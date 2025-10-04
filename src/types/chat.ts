@@ -9,6 +9,13 @@ export type Message = {
   fileName?: string;
   fileSizeLabel?: string; // e.g. "2.4 MB"
   fileType?: 'image' | 'pdf' | 'doc' | 'zip' | 'excel' | 'txt' | 'audio';
+  url?: string; // download URL for the file/image/audio
+  type?: string;
+  width?: number;  // for image
+  height?: number; // for image
+  size?: number;   // for file
+  name?: string;  // original filename if any
+  mime?: string;  // MIME type if any
 };
 
 export type SendPayload = {

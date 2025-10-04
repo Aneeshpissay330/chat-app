@@ -5,6 +5,7 @@ import firestore, {
 } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import type { ChatRow } from '../utils/chat';
+import { uploadChatFile } from './media';
 
 export type Chat = {
   id: string;
@@ -20,6 +21,18 @@ export type Chat = {
 export type MessageDoc = {
   id: string;
   text?: string;
+
+  // NEW: media / file variants
+  type?: 'text' | 'image' | 'video' | 'audio' | 'file';
+  url?: string; // downloadURL
+  mime?: string;
+  name?: string; // original filename
+  size?: number; // bytes
+  width?: number; // image/video
+  height?: number; // image/video
+  durationMs?: number; // video/audio
+  thumbUrl?: string | null;
+
   senderId: string;
   createdAt: FirebaseFirestoreTypes.Timestamp;
   status: 'sent' | 'delivered' | 'read';
@@ -53,6 +66,20 @@ function normalizeOtherUid(otherUid: string): string {
   return otherUid;
 }
 
+function sanitizeFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const out: Record<string, any> = {};
+  Object.keys(obj).forEach(k => {
+    const v = obj[k];
+    if (v === undefined) return; // drop undefined
+    if (typeof v === 'number' && Number.isNaN(v)) {
+      out[k] = null;
+      return;
+    }
+    out[k] = v;
+  });
+  return out as Partial<T>;
+}
+
 export async function ensureDMChat(otherUid: string): Promise<string> {
   const me = auth().currentUser?.uid;
   if (!me) throw new Error('Not authenticated');
@@ -70,7 +97,10 @@ export async function ensureDMChat(otherUid: string): Promise<string> {
     q = await CHATS.where('memberHash', '==', legacyHash).limit(1).get();
     if (!q.empty) {
       const ref = q.docs[0].ref;
-      await ref.set({ memberIds: [me, me], memberHash: `${me}_${me}` }, { merge: true });
+      await ref.set(
+        { memberIds: [me, me], memberHash: `${me}_${me}` },
+        { merge: true },
+      );
       return ref.id;
     }
   }
@@ -81,7 +111,10 @@ export async function ensureDMChat(otherUid: string): Promise<string> {
     const h = (doc.data() as any)?.memberHash;
     if (h === memberHash) return doc.id;
     if (other === me && h === `${me}_me`) {
-      await doc.ref.set({ memberIds: [me, me], memberHash: `${me}_${me}` }, { merge: true });
+      await doc.ref.set(
+        { memberIds: [me, me], memberHash: `${me}_${me}` },
+        { merge: true },
+      );
       return doc.id;
     }
   }
@@ -124,7 +157,6 @@ export async function findDMChat(otherUid: string): Promise<string | null> {
   }
   return null;
 }
-
 
 /** Subscribe to single chat metadata */
 export function subscribeChat(chatId: string, onData: (chat: Chat) => void) {
@@ -212,6 +244,96 @@ export async function sendText(chatId: string, text: string) {
   });
 
   return msgRef.id;
+}
+
+async function sendMediaInternal(
+  chatId: string,
+  payload: {
+    kind: 'image' | 'video' | 'audio' | 'file';
+    localPath: string;
+    mime?: string;
+    name?: string;
+    size?: number;
+    width?: number;
+    height?: number;
+    durationMs?: number;
+    lastMessageText?: string; // e.g., "[Photo]" "[Video]" …
+  },
+) {
+  try {
+    const me = auth().currentUser?.uid;
+    if (!me) throw new Error('Not authenticated');
+
+    const msgRef = CHATS.doc(chatId).collection('messages').doc();
+    const chatRef = CHATS.doc(chatId);
+
+    // 1) Upload to Storage
+    const uploaded = await uploadChatFile(chatId, {
+      localPath: payload.localPath,
+      mime: payload.mime,
+      name: payload.name,
+      size: payload.size,
+      width: payload.width,
+      height: payload.height,
+      durationMs: payload.durationMs,
+    });
+
+    // 2) Write message + update chat meta in a transaction
+    await firestore().runTransaction(async tx => {
+      const createdAt = firestore.FieldValue.serverTimestamp() as any;
+
+      const messageData = sanitizeFirestore({
+        type: payload.kind,
+        url: uploaded.url,
+        mime: uploaded.contentType,
+        name: uploaded.name,
+        size: uploaded.size,
+        width: uploaded.width,
+        height: uploaded.height,
+        durationMs: uploaded.durationMs,
+
+        text: '',
+        senderId: me,
+        createdAt,
+        status: 'sent',
+        seenBy: [me],
+        deliveredTo: [],
+      });
+
+      tx.set(msgRef, messageData);
+
+      const chatSnap = await tx.get(chatRef);
+      const chat = chatSnap.exists() ? (chatSnap.data() as any) : {};
+      const others = (chat.memberIds || []).filter((id: string) => id !== me);
+
+      const unread = { ...(chat.unread || {}) };
+      others.forEach((uid: string) => (unread[uid] = (unread[uid] || 0) + 1));
+
+      const lm =
+        payload.lastMessageText ??
+        (payload.kind === 'image'
+          ? '[Photo]'
+          : payload.kind === 'video'
+          ? '[Video]'
+          : payload.kind === 'audio'
+          ? '[Audio]'
+          : payload.name
+          ? `[File] ${payload.name}`
+          : '[File]');
+
+      const chatUpdate = sanitizeFirestore({
+        lastMessage: lm,
+        lastMessageAt: createdAt,
+        unread,
+      });
+
+      tx.set(chatRef, chatUpdate, { merge: true });
+    });
+
+    return msgRef.id;
+  } catch (error) {
+    console.error('sendMediaInternal error', error);
+  }
 }
 
 /** Mark messages as read + reset unread counter */
@@ -311,4 +433,99 @@ export async function getSelfChatMeta(): Promise<{
     lastMessageAt: data.lastMessageAt ?? null,
     unread: data.unread ?? {},
   };
+}
+
+export async function sendImage(
+  chatId: string,
+  args: {
+    localPath: string;
+    mime?: string;
+    width?: number;
+    height?: number;
+    size?: number;
+  },
+) {
+  try {
+    return sendMediaInternal(chatId, {
+      kind: 'image',
+      localPath: args.localPath,
+      mime: args.mime,
+      width: args.width,
+      height: args.height,
+      size: args.size,
+      lastMessageText: '[Photo]',
+    });
+  } catch (error) {
+    console.error('sendImage error', error);
+  }
+}
+
+export async function sendVideo(
+  chatId: string,
+  args: {
+    localPath: string;
+    mime?: string;
+    width?: number;
+    height?: number;
+    size?: number;
+    durationMs?: number;
+  },
+) {
+  try {
+    console.log('sendVideo', args, chatId);
+    return sendMediaInternal(chatId, {
+      kind: 'video',
+      localPath: args.localPath,
+      mime: args.mime,
+      width: args.width,
+      height: args.height,
+      size: args.size,
+      durationMs: Number.isFinite(args.durationMs)
+        ? args.durationMs
+        : undefined,
+      lastMessageText: '[Video]',
+    });
+  } catch (error) {
+    console.error('sendVideo error', error);
+  }
+}
+
+export async function sendAudio(
+  chatId: string,
+  args: {
+    localPath: string;
+    mime?: string;
+    size?: number;
+    durationMs?: number;
+    name?: string;
+  },
+) {
+  return sendMediaInternal(chatId, {
+    kind: 'audio',
+    localPath: args.localPath,
+    mime: args.mime ?? 'audio/mpeg',
+    size: args.size,
+    durationMs: args.durationMs,
+    lastMessageText: '[Audio]',
+    name: args.name,
+  });
+}
+
+export async function sendFile(
+  chatId: string,
+  args: {
+    localPath: string;
+    mime?: string;
+    size?: number;
+    name?: string;
+  },
+) {
+  return sendMediaInternal(chatId, {
+    kind: 'file',
+    localPath: args.localPath,
+    mime: args.mime,
+    size: args.size,
+    lastMessageText: args.name ? `[File] ${args.name}` : '[File]',
+    name: args.name,
+  });
 }

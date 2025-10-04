@@ -39,6 +39,9 @@ import {
   setTyping,
   subscribeMessages,
   subscribePresence,
+  sendFile,
+  sendImage,
+  sendVideo,
 } from '../../../../services/chat'; // <-- add this file from previous step
 
 type ChatRouteParams = {
@@ -46,7 +49,7 @@ type ChatRouteParams = {
 };
 
 type ChatPersonalNavigationParams = {
-  CameraScreen: undefined;
+  CameraScreen: { id: string };
   PersonalChatContact: undefined;
 };
 
@@ -85,6 +88,13 @@ export default function ChatView() {
             text: d.text,
             createdAt: d.createdAt.toDate().toISOString(),
             userId: d.senderId,
+            url: d.url,
+            type: d.type,
+            width: d.width,
+            height: d.height,
+            size: d.size,
+            name: d.name,
+            mime: d.mime,
             // you can add userName/userAvatar here if you fetch user profiles
           }));
           setMessages(mapped);
@@ -220,37 +230,76 @@ export default function ChatView() {
 
   const onPickDocument = useCallback(async () => {
     try {
-      const [result] = await pick({ mode: 'open' });
-      console.log(result);
-      // TODO: send as file message variant if you add sendFile(...)
+      const [doc] = await pick({ mode: 'open' });
+      if (!doc) return;
+
+      // @react-native-documents/picker returns a content uri on Android ("content://")
+      // For Firebase Storage putFile, pass the same uri; it handles content uris on Android.
+      // On iOS it will be "file://".
+      if (!chatId) return;
+
+      await sendFile(chatId, {
+        localPath: doc.uri,
+        mime: doc.type || 'application/octet-stream',
+        size: doc.size || 0,
+        name: doc.name || 'document',
+      });
     } catch (error) {
       console.log('Document picker error or cancelled', error);
     }
-  }, []);
+  }, [chatId]);
 
   const onOpenCamera = useCallback(async () => {
-    navigation.navigate('CameraScreen');
+    navigation.navigate('CameraScreen', { id: otherUid });
   }, [navigation]);
 
   const onOpenGallery = useCallback(async () => {
     try {
-      const result = await ImagePicker.openPicker({
-        mediaType: 'photo',
-        cropping: true,
-        freeStyleCropEnabled: true,
+      // Allow both photo & video; cropping only makes sense for images
+      const media: any = await ImagePicker.openPicker({
+        mediaType: 'any',
+        cropping: false,
+        // includeExif: true,
       });
-      console.log(result);
-      // TODO: upload and send as image message via sendMedia(...)
+      if (!chatId) return;
+
+      // image
+      if (media?.mime?.startsWith('image/')) {
+        await sendImage(chatId, {
+          localPath: media.path,
+          mime: media.mime,
+          width: media.width,
+          height: media.height,
+          size: media.size,
+        });
+        return;
+      }
+
+      // video
+      if (media?.mime?.startsWith('video/')) {
+        console.log('Send video', media);
+        await sendVideo(chatId, {
+          localPath: media.path,
+          mime: media.mime,
+          width: media.width,
+          height: media.height,
+          size: media.size,
+          durationMs:
+            typeof media.duration === 'number' ? media.duration : undefined,
+        });
+        return;
+      }
+
+      console.log('Unsupported media from gallery:', media?.mime);
     } catch (error) {
       console.log('Gallery error or cancelled', error);
     }
-  }, []);
+  }, [chatId]);
 
   const onRecordAudio = useCallback(() => {
     console.log('Record Audio');
     // TODO: integrate audio recorder + send as voice message
   }, []);
-
   return (
     <SafeAreaView
       edges={['bottom']}

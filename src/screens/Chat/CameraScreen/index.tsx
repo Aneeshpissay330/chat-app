@@ -1,6 +1,18 @@
-import { NavigationProp, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  NavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   useCameraDevice,
   Camera as VisionCamera,
@@ -15,11 +27,16 @@ import { useCameraPermissions } from '../../../hooks/useCameraPermissions';
 import { useRecordingControls } from '../../../hooks/useRecordingControls';
 import { useRecordingTimer } from '../../../hooks/useRecordingTimer';
 import { useTorch } from '../../../hooks/useTorch';
+import { findDMChat, sendImage, sendVideo } from '../../../services/chat';
 import { Mode } from '../../../types/camera';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import ImagePicker from 'react-native-image-crop-picker';
 
 export type RootTabParamList = {
   Gallery: undefined;
+};
+
+type ChatRouteParams = {
+  CameraScreen: { id: string; type?: 'group'; name?: string; avatar?: string };
 };
 
 const CameraScreen: React.FC = () => {
@@ -30,15 +47,58 @@ const CameraScreen: React.FC = () => {
   const isActive = useCameraLifecycle();
   const { hasCam } = useCameraPermissions(mode);
   const { flashOn, torch, toggleFlash } = useTorch(false);
+  const [chatId, setChatId] = useState<string>('');
+  const route = useRoute<RouteProp<ChatRouteParams, 'CameraScreen'>>();
+
+  const otherUid = route.params?.id; // receiver uid from route
 
   const cameraRef = useRef<VisionCamera>(null);
-  const onPhoto = useCallback((photo: PhotoFile) => {
-    // TODO: Handle photo (preview/upload)
-    console.log('Photo', photo.path);
-  }, []);
-  const onVideo = useCallback((video: VideoFile) => {
-    // TODO: Handle video (preview/upload)
-    console.log('Video', video.path);
+  const onPhoto = useCallback(
+    async (photo: PhotoFile) => {
+      // TODO: Handle photo (preview/upload)
+      // const result = await ImagePicker.openCropper({
+      //   mediaType: 'photo',
+      //   path: `file:/${photo.path}`,
+      //   cropping: true,
+      //   width: photo.width,
+      //   height: photo.height,
+      // });
+      // console.log('Cropped photo', result);
+      await sendImage(chatId, {
+        localPath: photo.path,
+        mime: 'image/jpg',
+        width: photo.width,
+        height: photo.height,
+        size: 0,
+      });
+    },
+    [chatId],
+  );
+  const onVideo = useCallback(
+    async (video: VideoFile) => {
+      // TODO: Handle video (preview/upload)
+      await sendVideo(chatId, {
+        localPath: `file:/${video.path}`,
+        mime: 'video/mov',
+        width: video.width,
+        height: video.height,
+        size: 0,
+        durationMs:
+          typeof video.duration === 'number' ? video.duration : undefined,
+      });
+      navigation.goBack();
+    },
+    [chatId],
+  );
+
+  const getChatId = async () => {
+    if (!otherUid) throw new Error('Missing receiver id');
+    const id = await findDMChat(otherUid);
+    setChatId(id || '');
+  };
+
+  useEffect(() => {
+    getChatId();
   }, []);
 
   const { isRecording, onShoot } = useRecordingControls(
@@ -55,9 +115,48 @@ const CameraScreen: React.FC = () => {
     if (nav.canGoBack()) nav.goBack();
   }, [nav]);
 
-  const onPressGallery = useCallback(() => {
+  const onPressGallery = useCallback(async () => {
     // TODO: open gallery picker or navigate to gallery
-    navigation.navigate("Gallery");
+    // navigation.navigate('Gallery');
+    try {
+      // Allow both photo & video; cropping only makes sense for images
+      const media: any = await ImagePicker.openPicker({
+        mediaType: 'any',
+        cropping: false,
+        // includeExif: true,
+      });
+      if (!chatId) return;
+
+      // image
+      if (media?.mime?.startsWith('image/')) {
+        await sendImage(chatId, {
+          localPath: media.path,
+          mime: media.mime,
+          width: media.width,
+          height: media.height,
+          size: media.size,
+        });
+        return;
+      }
+
+      // video
+      if (media?.mime?.startsWith('video/')) {
+        console.log('Send video', media);
+        await sendVideo(chatId, {
+          localPath: media.path,
+          mime: media.mime,
+          width: media.width,
+          height: media.height,
+          size: media.size,
+          durationMs:
+            typeof media.duration === 'number' ? media.duration : undefined,
+        });
+        return;
+      }
+      navigation.goBack();
+    } catch (error) {
+      console.log('Gallery error or cancelled', error);
+    }
   }, []);
 
   const onPressSwitchCamera = useCallback(() => {
