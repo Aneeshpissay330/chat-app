@@ -11,7 +11,7 @@ import {
   Text,
   useTheme
 } from 'react-native-paper';
-import { signOutGoogle } from '../../hooks/useGoogleSignIn';
+import { useGoogleAuth } from '../../hooks/useGoogleSignIn';
 
 export type RootNavigationParamList = {
   EditProfile: undefined;
@@ -19,6 +19,7 @@ export type RootNavigationParamList = {
 
 const Settings = () => {
   const theme = useTheme();
+  const { signOutGoogle } = useGoogleAuth();
 
   // Local UI state mirroring the toggles/choices in settings.txt
   const [themeChoice, setThemeChoice] = useState<'system' | 'light' | 'dark'>('system');

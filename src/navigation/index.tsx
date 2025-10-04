@@ -1,15 +1,26 @@
-import { View, Text } from 'react-native';
 import React from 'react';
-import Auth from '../screens/Auth';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
+import PhoneLoginScreen from '../screens/PhoneLoginScreen';
 import Stacks from './stacks';
+import { View, ActivityIndicator } from 'react-native';
+import GoogleLoginScreen from '../screens/GoogleLoginScreen';
 
 const Navigation = () => {
   const { user, initializing } = useFirebaseAuth();
-  if (initializing) return null;
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
-  if (!user) {
-    return <Auth />;
+  if (!user?.phoneNumber) {
+    return <PhoneLoginScreen />;
+  }
+
+  if (!user?.email) {
+    return <GoogleLoginScreen />;
   }
 
   return <Stacks />;
