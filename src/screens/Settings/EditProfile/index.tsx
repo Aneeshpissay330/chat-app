@@ -22,6 +22,7 @@ import {
   takeAvatarPhoto,
   uploadAvatar,
 } from '../../../services/avatar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MAX_BIO = 150;
 
@@ -139,7 +140,7 @@ const EditProfile = () => {
   }, [navigation, handleSave, saving]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView>
         {/* Photo section */}
         <View
@@ -340,7 +341,7 @@ const EditProfile = () => {
       </Portal>
 
       {/* (Your QR modal stays as-is) */}
-    </View>
+    </SafeAreaView>
   );
 };
 

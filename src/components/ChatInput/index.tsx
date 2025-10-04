@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { EmojiPopup } from 'react-native-emoji-popup';
 import { IconButton, TextInput, useTheme } from 'react-native-paper';
@@ -11,6 +11,7 @@ type Props = {
   onOpenCamera: () => Promise<void> | void;
   onOpenGallery: () => Promise<void> | void;
   onRecordAudio: () => Promise<void> | void;
+  onTyping?: (typing: boolean) => void; // NEW
 };
 
 export default function ChatInput({
@@ -19,6 +20,7 @@ export default function ChatInput({
   onOpenCamera,
   onOpenGallery,
   onRecordAudio,
+  onTyping
 }: Props) {
   const theme = useTheme();
   const [text, setText] = useState('');
@@ -40,6 +42,18 @@ export default function ChatInput({
   const CloseButton = ({ close }: { close: () => void }) => (
     <IconButton mode="contained-tonal" icon="close" onPress={close} />
   );
+
+  useEffect(() => {
+    if (!onTyping) return;
+    const typing = text.trim().length > 0;
+    onTyping(typing);
+
+    const timeout = setTimeout(() => {
+      onTyping(false);
+    }, 3000); // Stop typing after inactivity
+
+    return () => clearTimeout(timeout);
+  }, [text]);
   return (
     <View
       style={[styles.wrap, { borderTopColor: theme.colors.outlineVariant }]}
@@ -49,7 +63,7 @@ export default function ChatInput({
         closeButton={CloseButton}
         contentContainerStyle={{
           backgroundColor: theme.colors.background,
-          alignItems: 'flex-end'
+          alignItems: 'flex-end',
         }}
       >
         <IconButton mode="contained-tonal" icon="emoticon-outline" />

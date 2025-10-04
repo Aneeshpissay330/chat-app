@@ -1,74 +1,48 @@
+import { pick } from '@react-native-documents/picker';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
 import {
-  View,
-  FlatList,
-  ListRenderItem,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
+  Alert,
   Dimensions,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  ListRenderItem,
+  Platform,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
+import ImagePicker from 'react-native-image-crop-picker';
 import { Appbar, Avatar, List, useTheme } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../../../components/ChatBubble';
 import ChatInput from '../../../../components/ChatInput';
-import type { Message, SendPayload } from '../../../../types/chat';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useKeyboardStatus } from '../../../../hooks/useKeyboardStatus';
-import ImagePicker from 'react-native-image-crop-picker';
-import { pick } from '@react-native-documents/picker';
+import type { Message, SendPayload } from '../../../../types/chat';
 
-const ME = 'me-uid';
-
-const initialMessages: Message[] = [
-  {
-    id: 'm-1',
-    text: "Perfect! I'll see you there at 2 PM tomorrow. Looking forward to discussing the project details.",
-    createdAt: new Date().toISOString(),
-    userId: ME,
-  },
-  {
-    id: 'm-2',
-    text: 'Great! How about we meet at the coffee shop on 5th Street?',
-    createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-    userId: 'sarah',
-    userName: 'Sarah Johnson',
-    userAvatar:
-      'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg',
-  },
-  {
-    id: 'm-3',
-    text: 'Hey Sarah! Are we still on for the meeting tomorrow?',
-    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    userId: ME,
-  },
-  {
-    id: 'm-4',
-    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
-    userId: 'sarah',
-    userName: 'Sarah Johnson',
-    userAvatar:
-      'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg',
-    fileName: 'mockup_v2.png',
-    fileSizeLabel: '2.4 MB',
-    fileType: 'image',
-    text: 'Here are the updated designs!',
-  },
-];
+import auth from '@react-native-firebase/auth';
+import { useUserDoc } from '../../../../hooks/useUserDoc';
+import {
+  ensureDMChat,
+  heartbeatPresence,
+  markChatRead,
+  sendText,
+  setTyping,
+  subscribeMessages,
+  subscribePresence,
+} from '../../../../services/chat'; // <-- add this file from previous step
 
 type ChatRouteParams = {
-  ChatView: { id: string; type?: 'group' };
+  ChatView: { id: string; type?: 'group'; name?: string; avatar?: string };
 };
 
 type ChatPersonalNavigationParams = {
@@ -76,18 +50,99 @@ type ChatPersonalNavigationParams = {
   PersonalChatContact: undefined;
 };
 
-
 export default function ChatView() {
   const route = useRoute<RouteProp<ChatRouteParams, 'ChatView'>>();
+  const otherUid = route.params?.id; // receiver uid from route
   const isGroup = route.params?.type === 'group';
+  const displayName = route.params?.name ?? 'Chat';
   const theme = useTheme();
-  const navigation = useNavigation<StackNavigationProp<ChatPersonalNavigationParams>>();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const navigation =
+    useNavigation<StackNavigationProp<ChatPersonalNavigationParams>>();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [presenceText, setPresenceText] = useState<string>(''); // "Online" / "Last seen ..."
   const listRef = useRef<FlatList<Message>>(null);
   const isKeyboardOpen = useKeyboardStatus();
+  const { userDoc: meDoc } = useUserDoc();
+
+  const me = auth().currentUser?.uid;
+  const headerHeight = useHeaderHeight();
+  const isSelf = otherUid === me || otherUid === 'me';
+
+  // Ensure chat exists (or reuse) and then subscribe to messages
+  useEffect(() => {
+    let unsubMsgs: undefined | (() => void);
+    (async () => {
+      try {
+        if (!otherUid) throw new Error('Missing receiver id');
+        const id = await ensureDMChat(otherUid);
+        setChatId(id);
+
+        unsubMsgs = subscribeMessages(id, docs => {
+          // Map Firestore message to your UI Message type
+          const mapped: Message[] = docs.map(d => ({
+            id: d.id,
+            text: d.text,
+            createdAt: d.createdAt.toDate().toISOString(),
+            userId: d.senderId,
+            // you can add userName/userAvatar here if you fetch user profiles
+          }));
+          setMessages(mapped);
+        });
+      } catch (e: any) {
+        Alert.alert('Chat error', e?.message ?? 'Failed to open chat');
+      }
+    })();
+    return () => {
+      unsubMsgs?.();
+    };
+  }, [otherUid]);
+
+  // Mark chat read when focused
+  useEffect(() => {
+    if (!chatId) return;
+    const sub = navigation.addListener('focus', () => {
+      markChatRead(chatId).catch(() => {});
+    });
+    return sub;
+  }, [chatId, navigation]);
+
+  // Presence heartbeat for me (online)
+  useEffect(() => {
+    let t: any;
+    const start = async () => {
+      await heartbeatPresence(true);
+      t = setInterval(() => heartbeatPresence(true), 30000);
+    };
+    start();
+    return () => {
+      clearInterval(t);
+      heartbeatPresence(false);
+    };
+  }, []);
+
+  // Subscribe to other user's presence
+  useEffect(() => {
+    if (!otherUid || isSelf) return; // skip self
+    const unsub = subscribePresence(otherUid, (isOnline, lastActive) => {
+      if (isOnline) {
+        setPresenceText('Online');
+      } else if (lastActive) {
+        const mins = Math.max(
+          1,
+          Math.round((Date.now() - lastActive.getTime()) / 60000),
+        );
+        setPresenceText(`Last seen ${mins}m ago`);
+      } else {
+        setPresenceText('Offline');
+      }
+    });
+    return unsub;
+  }, [otherUid, isSelf]);
+
   const renderItem: ListRenderItem<Message> = useCallback(
     ({ item, index }) => {
-      const isMe = item.userId === ME;
+      const isMe = !!me && item.userId === me;
       const prev = messages[index + 1]; // inverted list
       const showAvatar = !isMe && (!prev || prev.userId !== item.userId);
       return (
@@ -99,84 +154,102 @@ export default function ChatView() {
         />
       );
     },
-    [messages],
+    [messages, me, isGroup],
   );
 
   const keyExtractor = useCallback((m: Message) => m.id, []);
 
-  const onSend = useCallback((payload: SendPayload) => {
-    const next: Message = {
-      id: `local-${Date.now()}`,
-      text: payload.text,
-      createdAt: new Date().toISOString(),
-      userId: ME,
+  const onSend = useCallback(
+    async (payload: SendPayload) => {
+      if (!chatId) return;
+      try {
+        await sendText(chatId, payload.text || '');
+        listRef.current?.scrollToOffset({ animated: true, offset: 0 });
+      } catch (e: any) {
+        Alert.alert('Send failed', e?.message ?? 'Please try again.');
+      }
+    },
+    [chatId],
+  );
+
+  // If your ChatInput exposes typing change, call setTyping(chatId, bool)
+  // Example:
+  const onTyping = useCallback(
+    (typing: boolean) => {
+      if (chatId) setTyping(chatId, typing);
+    },
+    [chatId],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (chatId) setTyping(chatId, false);
     };
-    setMessages(curr => [next, ...curr]);
-    // TODO: send to server
-    listRef.current?.scrollToOffset({ animated: true, offset: 0 });
-  }, []);
+  }, [chatId]);
 
-  const onPickDocument = useCallback(async () => {
-    // TODO: integrate react-native-document-picker
-    try {
-      const [result] = await pick({
-        mode: 'open',
-      });
-      console.log(result);
-    } catch (error) {
-      console.log('Document picker error or cancelled', error);
-    }
-  }, []);
-  const onOpenCamera = useCallback(async () => {
-    // TODO: integrate react-native-image-picker (launchCamera)
-    navigation.navigate('CameraScreen');
-    // try {
-    //   const result = await ImagePicker.openCamera({
-    //     width: 300,
-    //     height: 400,
-    //     cropping: true,
-    //   });
-    //   console.log(result);
-    // } catch (error) {
-    //   console.log('Camera error or cancelled', error);
-    // }
-  }, []);
-  const onOpenGallery = useCallback(async () => {
-    // TODO: integrate react-native-image-picker (launchImageLibrary)
-    // navigation.navigate('Gallery');
-    try {
-      const result = await ImagePicker.openPicker({
-        // multiple: true,
-        mediaType: 'photo',
-        cropping: true,
-        freeStyleCropEnabled: true,
-      });
-      console.log(result);
-    } catch (error) {
-      console.log('Gallery error or cancelled', error);
-    }
-  }, []);
-  const onRecordAudio = useCallback(() => {
-    // TODO: integrate recorder (e.g., react-native-audio-recorder-player)
-    console.log('Record Audio');
-  }, []);
-
+  // Attach header with presence
   useLayoutEffect(() => {
+    const headerTitle = isSelf
+      ? `You (@${meDoc?.username ?? 'you'})`
+      : displayName;
+
+    const headerSubtitle = isSelf ? '' : presenceText || ' ';
+
     navigation.setOptions({
       headerTitle: () => (
         <List.Item
-          title="Sarah Johnson"
-          description="Online"
-          left={props => <List.Icon {...props} icon="folder" />}
-          onPress={() => navigation.navigate('PersonalChatContact')}
+          title={headerTitle}
+          description={headerSubtitle}
+          left={props => (
+            <Avatar.Image
+              {...props}
+              size={40}
+              source={{ uri: meDoc?.photoURL || '' }}
+            />
+          )}
+          onPress={() => {
+            if (!isSelf) navigation.navigate('PersonalChatContact');
+          }}
         />
       ),
       headerRight: () => (
         <Appbar.Action icon="dots-vertical" onPress={() => {}} />
       ),
     });
+  }, [navigation, displayName, presenceText, isSelf, meDoc?.username]);
+
+  const onPickDocument = useCallback(async () => {
+    try {
+      const [result] = await pick({ mode: 'open' });
+      console.log(result);
+      // TODO: send as file message variant if you add sendFile(...)
+    } catch (error) {
+      console.log('Document picker error or cancelled', error);
+    }
+  }, []);
+
+  const onOpenCamera = useCallback(async () => {
+    navigation.navigate('CameraScreen');
   }, [navigation]);
-  const headerHeight = useHeaderHeight();
+
+  const onOpenGallery = useCallback(async () => {
+    try {
+      const result = await ImagePicker.openPicker({
+        mediaType: 'photo',
+        cropping: true,
+        freeStyleCropEnabled: true,
+      });
+      console.log(result);
+      // TODO: upload and send as image message via sendMedia(...)
+    } catch (error) {
+      console.log('Gallery error or cancelled', error);
+    }
+  }, []);
+
+  const onRecordAudio = useCallback(() => {
+    console.log('Record Audio');
+    // TODO: integrate audio recorder + send as voice message
+  }, []);
 
   return (
     <SafeAreaView
@@ -209,6 +282,7 @@ export default function ChatView() {
               onOpenCamera={onOpenCamera}
               onOpenGallery={onOpenGallery}
               onRecordAudio={onRecordAudio}
+              onTyping={onTyping} // if you expose this prop from ChatInput
             />
           </View>
         </TouchableWithoutFeedback>
