@@ -1,7 +1,9 @@
-import React from 'react';
-import { Alert, FlatList } from 'react-native';
-import ChatItem from '../../../components/ChatItem';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import React from 'react';
+import { FlatList } from 'react-native';
+import ChatItem from '../../../components/ChatItem';
+import { useUserDoc } from '../../../hooks/useUserDoc';
+import { buildSelfChat, ensureAvatar, mergeAndSort } from '../../../utils/chat';
 
 const chatData = [
   {
@@ -28,19 +30,29 @@ const chatData = [
   },
 ];
 
-export type RootNavigation = {
-  ChatView: { id: string };
-};
+type RootNavigation = { ChatView: { id: string } };
 
 const Personal = () => {
   const navigation = useNavigation<NavigationProp<RootNavigation>>();
+  const { userDoc } = useUserDoc();
+
+  const me = buildSelfChat(userDoc as any); // userDoc matches fields the util needs
+  const data = mergeAndSort(me, chatData);
+
   return (
     <FlatList
-      data={chatData}
+      data={data}
       keyExtractor={item => item.id}
       renderItem={({ item }) => (
         <ChatItem
-          {...item}
+          // don't spread; pass required strings explicitly
+          name={item.name}
+          avatar={ensureAvatar(item.avatar)} // -> string
+          lastMessage={item.lastMessage ?? ''} // -> string
+          date={item.date}
+          unreadCount={item.unreadCount ?? 0}
+          pinned={!!item.pinned}
+          online={!!item.online}
           onPress={() => navigation.navigate('ChatView', { id: item.id })}
         />
       )}
