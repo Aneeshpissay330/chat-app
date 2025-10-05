@@ -84,8 +84,7 @@ export default function ChatView() {
     (async () => {
       try {
         if (!otherUid) throw new Error('Missing receiver id');
-        let id = await findDMChat(otherUid);
-        if (!id) return; // Or wait until first message to create
+        let id = await ensureDMChat(otherUid);
         setChatId(id);
 
         unsubMsgs = subscribeMessages(id, docs => {
