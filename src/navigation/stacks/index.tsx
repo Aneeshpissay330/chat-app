@@ -9,11 +9,13 @@ import { useTheme } from 'react-native-paper';
 import ChatViewGroup from '../../screens/Chat/Group/ChatViewGroup';
 import GroupChatContact from '../../screens/Chat/Group/ChatViewGroup/GroupChatContact';
 import EditProfile from '../../screens/Settings/EditProfile';
+import { usePresenceHeartbeat } from '../../hooks/usePresenceHeartbeat';
 
 const Stack = createStackNavigator();
 
 function Stacks() {
   const theme = useTheme();
+  usePresenceHeartbeat();
   return (
     <Stack.Navigator
       screenOptions={{

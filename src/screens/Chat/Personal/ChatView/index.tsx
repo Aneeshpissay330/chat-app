@@ -22,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
-import { Appbar, Avatar, IconButton, List, useTheme } from 'react-native-paper';
+import { Avatar, IconButton, List, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../../../components/ChatBubble';
 import ChatInput from '../../../../components/ChatInput';
@@ -30,25 +30,25 @@ import { useKeyboardStatus } from '../../../../hooks/useKeyboardStatus';
 import type { Message, SendPayload } from '../../../../types/chat';
 
 import auth from '@react-native-firebase/auth';
+import RNFS from 'react-native-fs';
+import { FrequencyChart } from '../../../../components/FrequencyChart';
+import { useAudioRecorder } from '../../../../hooks/useAudioRecorder';
 import { useUserDoc } from '../../../../hooks/useUserDoc';
 import {
   ensureDMChat,
-  heartbeatPresence,
+  findDMChat,
   markChatRead,
-  sendText,
-  setTyping,
-  subscribeMessages,
-  subscribePresence,
+  sendAudio,
   sendFile,
   sendImage,
+  sendText,
   sendVideo,
-  sendAudio,
+  setTyping,
+  subscribeMessages,
+  subscribePresence
 } from '../../../../services/chat'; // <-- add this file from previous step
 import { colors } from '../../../../theme';
-import { FrequencyChart } from '../../../../components/FrequencyChart';
 import { FFT_SIZE } from '../../../../utils/audio';
-import { useAudioRecorder } from '../../../../hooks/useAudioRecorder';
-import RNFS from 'react-native-fs';
 
 type ChatRouteParams = {
   ChatView: { id: string; type?: 'group'; name?: string; avatar?: string };
@@ -84,7 +84,8 @@ export default function ChatView() {
     (async () => {
       try {
         if (!otherUid) throw new Error('Missing receiver id');
-        const id = await ensureDMChat(otherUid);
+        let id = await findDMChat(otherUid);
+        if (!id) return; // Or wait until first message to create
         setChatId(id);
 
         unsubMsgs = subscribeMessages(id, docs => {
@@ -122,20 +123,6 @@ export default function ChatView() {
     });
     return sub;
   }, [chatId, navigation]);
-
-  // Presence heartbeat for me (online)
-  useEffect(() => {
-    let t: any;
-    const start = async () => {
-      await heartbeatPresence(true);
-      t = setInterval(() => heartbeatPresence(true), 30000);
-    };
-    start();
-    return () => {
-      clearInterval(t);
-      heartbeatPresence(false);
-    };
-  }, []);
 
   // Subscribe to other user's presence
   useEffect(() => {
@@ -177,9 +164,13 @@ export default function ChatView() {
 
   const onSend = useCallback(
     async (payload: SendPayload) => {
-      if (!chatId) return;
       try {
-        await sendText(chatId, payload.text || '');
+        let currentChatId = chatId;
+        if (!currentChatId) {
+          currentChatId = await ensureDMChat(otherUid);
+          setChatId(currentChatId);
+        }
+        await sendText(currentChatId, payload.text || '');
         listRef.current?.scrollToOffset({ animated: true, offset: 0 });
       } catch (e: any) {
         Alert.alert('Send failed', e?.message ?? 'Please try again.');
@@ -330,7 +321,7 @@ export default function ChatView() {
       const stats = await RNFS.stat(filePath);
       await sendAudio(chatId, {
         localPath: `file:/${filePath}`,
-        size: stats.size
+        size: stats.size,
       });
       return;
     }
