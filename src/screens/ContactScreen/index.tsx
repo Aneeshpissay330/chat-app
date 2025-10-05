@@ -74,7 +74,7 @@ const ContactScreen = () => {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       <List.Section>
-        <List.Subheader>Matched Users</List.Subheader>
+        <List.Subheader>All Contacts</List.Subheader>
       </List.Section>
 
       <FlashList
