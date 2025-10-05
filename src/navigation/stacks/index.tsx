@@ -10,6 +10,7 @@ import ChatViewGroup from '../../screens/Chat/Group/ChatViewGroup';
 import GroupChatContact from '../../screens/Chat/Group/ChatViewGroup/GroupChatContact';
 import EditProfile from '../../screens/Settings/EditProfile';
 import { usePresenceHeartbeat } from '../../hooks/usePresenceHeartbeat';
+import ContactScreen from '../../screens/ContactScreen';
 
 const Stack = createStackNavigator();
 
@@ -50,6 +51,7 @@ function Stacks() {
       <Stack.Screen name="Gallery" component={Gallery} />
       <Stack.Screen name="MediaTabsScreen" component={MediaTabs} />
       <Stack.Screen name='EditProfile' component={EditProfile} />
+      <Stack.Screen name='ContactScreen' component={ContactScreen} options={{ title: 'Contacts' }} />
     </Stack.Navigator>
   );
 }

@@ -4,6 +4,7 @@ import PhoneLoginScreen from '../screens/PhoneLoginScreen';
 import Stacks from './stacks';
 import { View, ActivityIndicator } from 'react-native';
 import GoogleLoginScreen from '../screens/GoogleLoginScreen';
+import OnboardingStack from './stacks/Onboarding';
 
 const Navigation = () => {
   const { user, initializing } = useFirebaseAuth();
@@ -24,6 +25,7 @@ const Navigation = () => {
   }
 
   return <Stacks />;
+  // return <OnboardingStack />
 };
 
 export default Navigation;
