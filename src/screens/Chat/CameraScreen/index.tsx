@@ -54,30 +54,26 @@ const CameraScreen: React.FC = () => {
 
   const cameraRef = useRef<VisionCamera>(null);
   const onPhoto = useCallback(
-    async (photo: PhotoFile) => {
-      // TODO: Handle photo (preview/upload)
-      // const result = await ImagePicker.openCropper({
-      //   mediaType: 'photo',
-      //   path: `file:/${photo.path}`,
-      //   cropping: true,
-      //   width: photo.width,
-      //   height: photo.height,
-      // });
-      // console.log('Cropped photo', result);
-      await sendImage(chatId, {
+    (photo: PhotoFile) => {
+      // Fire and forget — no await
+      sendImage(chatId, {
         localPath: photo.path,
         mime: 'image/jpg',
         width: photo.width,
         height: photo.height,
         size: 0,
       });
+
+      // Go back immediately
+      navigation.goBack();
     },
     [chatId],
   );
+
   const onVideo = useCallback(
-    async (video: VideoFile) => {
-      // TODO: Handle video (preview/upload)
-      await sendVideo(chatId, {
+    (video: VideoFile) => {
+      // Fire and forget — do not await
+      sendVideo(chatId, {
         localPath: `file:/${video.path}`,
         mime: 'video/mov',
         width: video.width,
@@ -86,6 +82,8 @@ const CameraScreen: React.FC = () => {
         durationMs:
           typeof video.duration === 'number' ? video.duration : undefined,
       });
+
+      // Go back immediately
       navigation.goBack();
     },
     [chatId],

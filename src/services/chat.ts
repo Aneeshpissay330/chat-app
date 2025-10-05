@@ -18,6 +18,7 @@ export type Chat = {
   typing?: Record<string, boolean>;
 };
 
+// types: extend status to include "pending"
 export type MessageDoc = {
   id: string;
   text?: string;
@@ -35,7 +36,9 @@ export type MessageDoc = {
 
   senderId: string;
   createdAt: FirebaseFirestoreTypes.Timestamp;
-  status: 'sent' | 'delivered' | 'read';
+
+  // was: 'sent' | 'delivered' | 'read'
+  status: 'pending' | 'sent' | 'delivered' | 'read';
   seenBy?: string[];
   deliveredTo?: string[];
 };
@@ -246,6 +249,7 @@ export async function sendText(chatId: string, text: string) {
   return msgRef.id;
 }
 
+// sendMediaInternal: write pending first, then upload, then patch to sent
 async function sendMediaInternal(
   chatId: string,
   payload: {
@@ -267,40 +271,30 @@ async function sendMediaInternal(
     const msgRef = CHATS.doc(chatId).collection('messages').doc();
     const chatRef = CHATS.doc(chatId);
 
-    // 1) Upload to Storage
-    const uploaded = await uploadChatFile(chatId, {
-      localPath: payload.localPath,
-      mime: payload.mime,
-      name: payload.name,
-      size: payload.size,
-      width: payload.width,
-      height: payload.height,
-      durationMs: payload.durationMs,
-    });
-
-    // 2) Write message + update chat meta in a transaction
+    // 1) Fast path: write a "pending" message immediately + update chat meta
     await firestore().runTransaction(async tx => {
       const createdAt = firestore.FieldValue.serverTimestamp() as any;
 
-      const messageData = sanitizeFirestore({
+      // Inside the transaction — step 1: create Firestore doc with localPath as `url`
+      const pendingMessage = sanitizeFirestore({
         type: payload.kind,
-        url: uploaded.url,
-        mime: uploaded.contentType,
-        name: uploaded.name,
-        size: uploaded.size,
-        width: uploaded.width,
-        height: uploaded.height,
-        durationMs: uploaded.durationMs,
+        url: payload.localPath, // ✅ Show local media immediately
+        mime: payload.mime,
+        name: payload.name,
+        size: payload.size,
+        width: payload.width,
+        height: payload.height,
+        durationMs: payload.durationMs,
 
         text: '',
         senderId: me,
         createdAt,
-        status: 'sent',
+        status: 'pending',
         seenBy: [me],
         deliveredTo: [],
       });
 
-      tx.set(msgRef, messageData);
+      tx.set(msgRef, pendingMessage);
 
       const chatSnap = await tx.get(chatRef);
       const chat = chatSnap.exists() ? (chatSnap.data() as any) : {};
@@ -330,9 +324,36 @@ async function sendMediaInternal(
       tx.set(chatRef, chatUpdate, { merge: true });
     });
 
+    // 2) Upload to Storage (can take time)
+    const uploaded = await uploadChatFile(chatId, {
+      localPath: payload.localPath,
+      mime: payload.mime,
+      name: payload.name,
+      size: payload.size,
+      width: payload.width,
+      height: payload.height,
+      durationMs: payload.durationMs,
+    });
+
+    // 3) Patch the same message doc with storage fields + flip to "sent"
+    const sentPatch = sanitizeFirestore({
+      url: uploaded.url, // ✅ Overwrite local URI with cloud URL
+      mime: uploaded.contentType ?? payload.mime,
+      name: uploaded.name ?? payload.name,
+      size: uploaded.size ?? payload.size,
+      width: uploaded.width ?? payload.width,
+      height: uploaded.height ?? payload.height,
+      durationMs: uploaded.durationMs ?? payload.durationMs,
+      status: 'sent',
+    });
+
+    await msgRef.set(sentPatch, { merge: true });
+
     return msgRef.id;
   } catch (error) {
     console.error('sendMediaInternal error', error);
+    // Optional: consider marking a separate field like { uploadError: true }
+    // while keeping status as 'pending' so the UI can expose a retry.
   }
 }
 
