@@ -42,8 +42,13 @@ import {
   sendFile,
   sendImage,
   sendVideo,
+  sendAudio,
 } from '../../../../services/chat'; // <-- add this file from previous step
 import { colors } from '../../../../theme';
+import { FrequencyChart } from '../../../../components/FrequencyChart';
+import { FFT_SIZE } from '../../../../utils/audio';
+import { useAudioRecorder } from '../../../../hooks/useAudioRecorder';
+import RNFS from 'react-native-fs';
 
 type ChatRouteParams = {
   ChatView: { id: string; type?: 'group'; name?: string; avatar?: string };
@@ -297,10 +302,39 @@ export default function ChatView() {
     }
   }, [chatId]);
 
-  const onRecordAudio = useCallback(() => {
-    console.log('Record Audio');
-    // TODO: integrate audio recorder + send as voice message
+  const { start, stop, isRecording, freqs, filePath, togglePause, isPaused } =
+    useAudioRecorder({
+      sampleRate: 16000,
+      bufferLengthInSamples: 16000,
+      fftSize: 512,
+      smoothing: 0.8,
+      monitor: false,
+    });
+  const onRecordAudio = useCallback(async () => {
+    await start();
   }, []);
+  const onCancelRecording = useCallback(async () => {
+    if (isRecording) {
+      await stop();
+    }
+    if (filePath) {
+      await RNFS.unlink(filePath);
+    }
+  }, [isRecording, filePath]);
+  const onSendRecording = useCallback(async () => {
+    if (isRecording) {
+      await stop();
+    }
+    if (filePath) {
+      if (!chatId) return;
+      const stats = await RNFS.stat(filePath);
+      await sendAudio(chatId, {
+        localPath: `file:/${filePath}`,
+        size: stats.size
+      });
+      return;
+    }
+  }, [isRecording, filePath]);
   return (
     <SafeAreaView
       edges={['bottom']}
@@ -331,19 +365,47 @@ export default function ChatView() {
                 autoscrollToTopThreshold: 10,
               }}
             />
-            <View style={{ justifyContent: 'space-between', columnGap: 8 ,flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4}}>
-              <IconButton icon="trash-can-outline" />
-              <IconButton icon="microphone-outline" iconColor="red" size={30} />
-              <IconButton icon="send-circle" iconColor={colors.primary} size={45} />
-            </View>
-            {/* <ChatInput
-              onSend={onSend}
-              onPickDocument={onPickDocument}
-              onOpenCamera={onOpenCamera}
-              onOpenGallery={onOpenGallery}
-              onRecordAudio={onRecordAudio}
-              onTyping={onTyping} // if you expose this prop from ChatInput
-            /> */}
+            {isRecording ? (
+              <View style={{ flex: 1, maxHeight: 140 }}>
+                <FrequencyChart data={freqs} dataSize={FFT_SIZE / 2} />
+                <View
+                  style={{
+                    justifyContent: 'space-between',
+                    columnGap: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <IconButton
+                    icon="trash-can-outline"
+                    onPress={onCancelRecording}
+                  />
+                  <IconButton
+                    icon={!isPaused ? 'pause' : 'microphone-outline'}
+                    iconColor="red"
+                    size={30}
+                    onPress={togglePause}
+                  />
+                  <IconButton
+                    icon="send-circle"
+                    iconColor={colors.primary}
+                    size={45}
+                    onPress={onSendRecording}
+                  />
+                </View>
+              </View>
+            ) : (
+              <ChatInput
+                onSend={onSend}
+                onPickDocument={onPickDocument}
+                onOpenCamera={onOpenCamera}
+                onOpenGallery={onOpenGallery}
+                onRecordAudio={onRecordAudio}
+                onTyping={onTyping} // if you expose this prop from ChatInput
+              />
+            )}
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>

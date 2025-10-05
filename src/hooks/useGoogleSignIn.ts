@@ -33,7 +33,7 @@ export function useGoogleAuth(): UseGoogleAuthResult {
       }
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      const response = await GoogleSignin.signIn();
+      await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
       const idToken = tokens.idToken;
 

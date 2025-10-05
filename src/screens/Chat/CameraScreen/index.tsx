@@ -141,7 +141,6 @@ const CameraScreen: React.FC = () => {
 
       // video
       if (media?.mime?.startsWith('video/')) {
-        console.log('Send video', media);
         await sendVideo(chatId, {
           localPath: media.path,
           mime: media.mime,

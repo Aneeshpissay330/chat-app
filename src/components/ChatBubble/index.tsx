@@ -1,9 +1,17 @@
 import React from 'react';
-import { Alert, Image, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  Linking,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Icon, Text, useTheme } from 'react-native-paper';
 import { Message } from '../../types/chat';
 import { formatChatDate } from '../../utils/date';
 import Video from 'react-native-video';
+import AudioFilePlayer from '../AudioFilePlayer';
 
 type Props = {
   message: Message;
@@ -59,7 +67,7 @@ export default function ChatBubble({
   }
   function isDocLike(mime?: Message['mime']) {
     // Everything that is NOT image/video/audio is treated as a document/file card
-    if(mime?.includes("application/")) return true;
+    if (mime?.includes('application/')) return true;
     if (!mime) return false;
     if (mime.startsWith('image/')) return false;
     if (mime.startsWith('video/')) return false;
@@ -224,7 +232,7 @@ export default function ChatBubble({
                     <Text
                       variant="bodyMedium"
                       numberOfLines={1}
-                      ellipsizeMode='tail'
+                      ellipsizeMode="tail"
                       style={{
                         fontWeight: '600',
                         color: isMe ? '#fff' : '#111827',
@@ -269,6 +277,13 @@ export default function ChatBubble({
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {message.mime?.includes('audio/') && (
+            <AudioFilePlayer
+              filePath={message.url || ""}
+              onDeleted={p => console.log('deleted', p)}
+            />
+          )}
 
           {/* Message text */}
           {message.text ? (

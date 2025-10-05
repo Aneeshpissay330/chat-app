@@ -45,7 +45,7 @@ export function useFirebaseAuth() {
           p => p.providerId === 'google.com',
         );
         const existingDoc = await ref.get();
-        if (!existingDoc.exists) {
+        if (!existingDoc.data()?.email) {
           await ref.set(
             {
               uid: firebaseUser.uid,
