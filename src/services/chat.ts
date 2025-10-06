@@ -236,26 +236,21 @@ export async function sendText(chatId: string, text: string) {
     const chat = chatSnap.exists() ? (chatSnap.data() as any) : {};
     const others = (chat.memberIds || []).filter((id: string) => id !== me);
 
+    const unread: Record<string, number> = { ...(chat.unread || {}) };
+    others.forEach((uid: string) => {
+      unread[uid] = (unread[uid] || 0) + 1;
+    });
+    unread[me] = 0;
     // Set metadata updates
     tx.set(
       chatRef,
       {
         lastMessage: text,
         lastMessageAt: createdAt,
+        unread
       },
-      { merge: true }
+      { merge: true },
     );
-
-    // 🔥 Safely increment unread counts
-    others.forEach((uid: string) => {
-      tx.set(
-        chatRef,
-        {
-          [`unread.${uid}`]: firestore.FieldValue.increment(1),
-        },
-        { merge: true }
-      );
-    });
   });
 
   return msgRef.id;
@@ -377,23 +372,48 @@ export async function markChatRead(chatId: string) {
   const chatRef = CHATS.doc(chatId);
   const msgsRef = chatRef.collection('messages');
 
-  const unreadSnap = await msgsRef
+  // 1) Fetch incoming messages (can't combine != with IN on another field).
+  // Firestore requires orderBy on the same field when using '!='.
+  const incomingSnap = await msgsRef
     .where('senderId', '!=', me)
-    .where('status', 'in', ['sent', 'delivered'])
+    .orderBy('senderId')
     .get();
 
+  // 2) Batch-update only those with status 'sent' or 'delivered'
   const batch = firestore().batch();
-  unreadSnap.forEach(d => {
-    batch.update(d.ref, {
-      status: 'read',
-      seenBy: firestore.FieldValue.arrayUnion(me),
-    });
+  incomingSnap.forEach(d => {
+    const data = d.data() as any;
+    if (data.status === 'sent' || data.status === 'delivered') {
+      batch.update(d.ref, {
+        status: 'read',
+        seenBy: firestore.FieldValue.arrayUnion(me),
+      });
+    }
   });
-
-  batch.set(chatRef, { [`unread.${me}`]: 0 }, { merge: true });
   await batch.commit();
-}
 
+  // 3) Option A: read chat, compute the whole unread map, write it back
+  await firestore().runTransaction(async tx => {
+    const now = firestore.FieldValue.serverTimestamp() as any;
+
+    const snap = await tx.get(chatRef);
+    const chat = snap.exists() ? (snap.data() as any) : {};
+
+    const unread: Record<string, number> = { ...(chat.unread || {}) };
+    unread[me] = 0; // I’ve read everything in this chat
+    console.log(unread)
+    tx.set(
+      chatRef,
+      {
+        unread,                    // write the whole map (Option A)
+        updatedAt: now,
+        // optional but handy per-user read marker:
+        lastReadAt: { ...(chat.lastReadAt || {}), [me]: now },
+      },
+      { merge: true },
+    );
+  });
+}
 /** Set typing state in chat doc */
 export async function setTyping(chatId: string, isTyping: boolean) {
   const me = auth().currentUser?.uid;
@@ -570,62 +590,70 @@ export function subscribeMyChats(
   const me = auth().currentUser?.uid;
   if (!me) throw new Error('Not authenticated');
 
-  return firestore()
-    .collection('chats')
-    .where('memberIds', 'array-contains', me)
-    // .orderBy('lastMessageAt', 'desc') // enable after creating index
-    .limit(limitCount)
-    .onSnapshot(async (snap) => {
-      const rows: ChatRow[] = [];
+  return (
+    firestore()
+      .collection('chats')
+      .where('memberIds', 'array-contains', me)
+      // .orderBy('lastMessageAt', 'desc') // enable after creating index
+      .limit(limitCount)
+      .onSnapshot(async snap => {
+        const rows: ChatRow[] = [];
 
-      for (const d of snap.docs) {
-        const c = d.data() as any;
-        const memberIds: string[] = Array.isArray(c.memberIds) ? c.memberIds : [];
-        const unique = [...new Set(memberIds)];
+        for (const d of snap.docs) {
+          const c = d.data() as any;
+          const memberIds: string[] = Array.isArray(c.memberIds)
+            ? c.memberIds
+            : [];
+          const unique = [...new Set(memberIds)];
 
-        const isSelfChat =
-          (unique.length === 1 && unique[0] === me) ||
-          c.memberHash === `${me}_${me}` ||
-          c.memberHash === `${me}_me`;
-        if (isSelfChat) continue;
+          const isSelfChat =
+            (unique.length === 1 && unique[0] === me) ||
+            c.memberHash === `${me}_${me}` ||
+            c.memberHash === `${me}_me`;
+          if (isSelfChat) continue;
 
-        const others = unique.filter((u) => u !== me);
-        const otherUid = others[0]; // DM only
+          const others = unique.filter(u => u !== me);
+          const otherUid = others[0]; // DM only
 
-        let name = c.title || 'Chat';
-        let avatar: string | undefined;
+          let name = c.title || 'Chat';
+          let avatar: string | undefined;
 
-        if (!c.title && otherUid) {
-          try {
-            const userSnap = await firestore().collection('users').doc(otherUid).get();
-            if (userSnap.exists()) {
-              const user = userSnap.data() as any;
-              name = user?.displayName ?? user?.username ?? user?.phoneNumber ?? 'Chat';
-              avatar = user?.photoURL;
+          if (!c.title && otherUid) {
+            try {
+              const userSnap = await firestore()
+                .collection('users')
+                .doc(otherUid)
+                .get();
+              if (userSnap.exists()) {
+                const user = userSnap.data() as any;
+                name =
+                  user?.displayName ??
+                  user?.username ??
+                  user?.phoneNumber ??
+                  'Chat';
+                avatar = user?.photoURL;
+              }
+            } catch (e) {
+              console.warn('Failed to fetch user doc for', otherUid, e);
             }
-          } catch (e) {
-            console.warn('Failed to fetch user doc for', otherUid, e);
           }
+
+          rows.push({
+            id: otherUid, // using UID for ChatView navigation (DMs)
+            name,
+            avatar,
+            lastMessage: c.lastMessage ?? '',
+            date:
+              c.lastMessageAt?.toDate?.()?.toISOString?.() ??
+              c.createdAt?.toDate?.()?.toISOString?.() ??
+              new Date().toISOString(),
+            unreadCount: (c.unread && c.unread[me]) || 0,
+            pinned: !!c.pinned,
+            online: false,
+          });
         }
 
-        // ✅ Read unread using dotted path written via FieldValue.increment
-        const unreadCount = (d.get?.(`unread.${me}`) as number | undefined) ?? 0;
-
-        rows.push({
-          id: otherUid, // using UID for ChatView navigation (DMs)
-          name,
-          avatar,
-          lastMessage: c.lastMessage ?? '',
-          date:
-            c.lastMessageAt?.toDate?.()?.toISOString?.() ??
-            c.createdAt?.toDate?.()?.toISOString?.() ??
-            new Date().toISOString(),
-          unreadCount,
-          pinned: !!c.pinned,
-          online: false,
-        });
-      }
-
-      onRows(rows);
-    });
+        onRows(rows);
+      })
+  );
 }

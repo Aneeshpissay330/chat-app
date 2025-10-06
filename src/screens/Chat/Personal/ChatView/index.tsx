@@ -1,6 +1,11 @@
 import { pick } from '@react-native-documents/picker';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import {
+  RouteProp,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, {
   useCallback,
@@ -116,14 +121,14 @@ export default function ChatView() {
     };
   }, [otherUid]);
 
+  const isFocused = useIsFocused();
   // Mark chat read when focused
   useEffect(() => {
     if (!chatId) return;
-    const sub = navigation.addListener('focus', () => {
-      markChatRead(chatId).catch(() => {});
-    });
-    return sub;
-  }, [chatId, navigation]);
+    if(isFocused) {
+      markChatRead(chatId)
+    }
+  }, [chatId, isFocused, messages]);
 
   // Subscribe to other user's presence
   useEffect(() => {
@@ -148,12 +153,12 @@ export default function ChatView() {
     ({ item, index }) => {
       const isMe = !!me && item.userId === me;
       const prev = messages[index + 1]; // inverted list
-      const showAvatar = !isMe && (!prev || prev.userId !== item.userId);
+      // const showAvatar = !isMe && (!prev || prev.userId !== item.userId);
       return (
         <ChatBubble
           message={item}
           isMe={isMe}
-          showAvatar={showAvatar}
+          showAvatar={false}
           showName={isGroup && !isMe}
         />
       );

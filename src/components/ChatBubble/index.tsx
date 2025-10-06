@@ -83,7 +83,7 @@ export default function ChatBubble({
       ) : !isMe && showAvatar ? (
         <View style={[styles.avatar, { backgroundColor: '#ddd' }]} />
       ) : (
-        <View style={{ width: 24 }} />
+        null
       )}
 
       <View style={{ maxWidth: '78%' }}>
