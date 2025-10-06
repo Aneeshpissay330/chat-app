@@ -219,31 +219,43 @@ export async function sendText(chatId: string, text: string) {
   await firestore().runTransaction(async tx => {
     const createdAt = firestore.FieldValue.serverTimestamp() as any;
 
+    // Set the message
     tx.set(msgRef, {
+      id: msgRef.id,
       text,
       senderId: me,
       createdAt,
       status: 'sent',
       seenBy: [me],
       deliveredTo: [],
+      type: 'text',
     });
 
+    // Get chat to find members
     const chatSnap = await tx.get(chatRef);
     const chat = chatSnap.exists() ? (chatSnap.data() as any) : {};
     const others = (chat.memberIds || []).filter((id: string) => id !== me);
 
-    const unread = { ...(chat.unread || {}) };
-    others.forEach((uid: string) => (unread[uid] = (unread[uid] || 0) + 1));
-
+    // Set metadata updates
     tx.set(
       chatRef,
       {
         lastMessage: text,
         lastMessageAt: createdAt,
-        unread,
       },
-      { merge: true },
+      { merge: true }
     );
+
+    // 🔥 Safely increment unread counts
+    others.forEach((uid: string) => {
+      tx.set(
+        chatRef,
+        {
+          [`unread.${uid}`]: firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
+    });
   });
 
   return msgRef.id;
@@ -549,4 +561,71 @@ export async function sendFile(
     lastMessageText: args.name ? `[File] ${args.name}` : '[File]',
     name: args.name,
   });
+}
+
+export function subscribeMyChats(
+  onRows: (rows: ChatRow[]) => void,
+  limitCount = 100,
+) {
+  const me = auth().currentUser?.uid;
+  if (!me) throw new Error('Not authenticated');
+
+  return firestore()
+    .collection('chats')
+    .where('memberIds', 'array-contains', me)
+    // .orderBy('lastMessageAt', 'desc') // enable after creating index
+    .limit(limitCount)
+    .onSnapshot(async (snap) => {
+      const rows: ChatRow[] = [];
+
+      for (const d of snap.docs) {
+        const c = d.data() as any;
+        const memberIds: string[] = Array.isArray(c.memberIds) ? c.memberIds : [];
+        const unique = [...new Set(memberIds)];
+
+        const isSelfChat =
+          (unique.length === 1 && unique[0] === me) ||
+          c.memberHash === `${me}_${me}` ||
+          c.memberHash === `${me}_me`;
+        if (isSelfChat) continue;
+
+        const others = unique.filter((u) => u !== me);
+        const otherUid = others[0]; // DM only
+
+        let name = c.title || 'Chat';
+        let avatar: string | undefined;
+
+        if (!c.title && otherUid) {
+          try {
+            const userSnap = await firestore().collection('users').doc(otherUid).get();
+            if (userSnap.exists()) {
+              const user = userSnap.data() as any;
+              name = user?.displayName ?? user?.username ?? user?.phoneNumber ?? 'Chat';
+              avatar = user?.photoURL;
+            }
+          } catch (e) {
+            console.warn('Failed to fetch user doc for', otherUid, e);
+          }
+        }
+
+        // ✅ Read unread using dotted path written via FieldValue.increment
+        const unreadCount = (d.get?.(`unread.${me}`) as number | undefined) ?? 0;
+
+        rows.push({
+          id: otherUid, // using UID for ChatView navigation (DMs)
+          name,
+          avatar,
+          lastMessage: c.lastMessage ?? '',
+          date:
+            c.lastMessageAt?.toDate?.()?.toISOString?.() ??
+            c.createdAt?.toDate?.()?.toISOString?.() ??
+            new Date().toISOString(),
+          unreadCount,
+          pinned: !!c.pinned,
+          online: false,
+        });
+      }
+
+      onRows(rows);
+    });
 }

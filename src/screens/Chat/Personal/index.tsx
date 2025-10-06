@@ -1,23 +1,33 @@
-import { NavigationProp, useNavigation } from '@react-navigation/native';
-import React from 'react';
+// app/(tabs)/personal/index.tsx
+import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import ChatItem from '../../../components/ChatItem';
-
 import { FAB, useTheme } from 'react-native-paper';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
+import ChatItem from '../../../components/ChatItem';
+import { ensureAvatar, type ChatRow } from '../../../utils/chat';
+import { subscribeMyChats } from '../../../services/chat';
 import { useSelfChatRow } from '../../../hooks/useSelfChat';
-import { ensureAvatar } from '../../../utils/chat';
 
-type RootNavigation = { ChatView: { id: string }, ContactScreen: undefined };
+type RootNavigation = { ChatView: { id: string; type?: 'group'; name?: string; avatar?: string }; ContactScreen: undefined };
 
 const Personal = () => {
   const navigation = useNavigation<NavigationProp<RootNavigation>>();
-  const selfChat = useSelfChatRow();
-  const data = selfChat ? [selfChat] : [];
   const theme = useTheme();
+  const selfChat = useSelfChatRow();
+  const [chats, setChats] = useState<ChatRow[]>([]);
+
+  useEffect(() => {
+    const unsub = subscribeMyChats(fetchedChats => {
+      const list = selfChat ? [selfChat, ...fetchedChats] : fetchedChats;
+      setChats(list);
+    });
+    return unsub;
+  }, [selfChat]);
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <FlatList
-        data={data}
+        data={chats}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <ChatItem
@@ -28,7 +38,13 @@ const Personal = () => {
             unreadCount={item.unreadCount ?? 0}
             pinned={!!item.pinned}
             online={!!item.online}
-            onPress={() => navigation.navigate('ChatView', { id: item.id })}
+            onPress={() =>
+              navigation.navigate('ChatView', {
+                id: item.id,
+                name: item.name ?? 'Chat',
+                avatar: item.avatar ?? '',
+              })
+            }
           />
         )}
       />
@@ -42,12 +58,7 @@ const Personal = () => {
 };
 
 const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-  },
+  fab: { position: 'absolute', margin: 16, right: 0, bottom: 0 },
 });
 
 export default Personal;

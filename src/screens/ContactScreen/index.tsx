@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { useNavigation } from '@react-navigation/native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Avatar,
@@ -18,9 +18,13 @@ import {
 } from '../../features/contacts';
 import { useUserDoc } from '../../hooks/useUserDoc';
 
+export type RootNavigationParamList = {
+  ChatView: { id: string; name?: string; avatar?: string };
+};
+
 const ContactScreen = () => {
   const dispatch = useAppDispatch();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootNavigationParamList>>();
   const theme = useTheme();
   const { userDoc } = useUserDoc();
   const status = useAppSelector(selectContactsStatus);
@@ -103,9 +107,13 @@ const ContactScreen = () => {
             <List.Item
               title={title}
               description={item.phoneNumber ?? undefined}
-              left={(props) =>
+              left={props =>
                 item.photoURL ? (
-                  <Avatar.Image {...props} size={40} source={{ uri: item.photoURL }} />
+                  <Avatar.Image
+                    {...props}
+                    size={40}
+                    source={{ uri: item.photoURL }}
+                  />
                 ) : (
                   <Avatar.Text
                     size={40}
@@ -120,8 +128,19 @@ const ContactScreen = () => {
                 )
               }
               right={props => <List.Icon {...props} icon="chevron-right" />}
+              // ContactScreen
               onPress={() => {
-                // TODO: navigate to your own profile or settings if isYou, else other user's profile/chat
+                const rawName =
+                  item.displayName ??
+                  item.username ??
+                  item.phoneNumber ??
+                  'Unknown';
+
+                navigation.navigate('ChatView', {
+                  id: item.uid, // <-- must be uid, not item.id
+                  name: rawName, // <-- not "You"
+                  avatar: item.photoURL ?? '',
+                });
               }}
             />
           );

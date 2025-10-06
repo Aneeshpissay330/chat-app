@@ -45,7 +45,7 @@ import {
   sendVideo,
   setTyping,
   subscribeMessages,
-  subscribePresence
+  subscribePresence,
 } from '../../../../services/chat'; // <-- add this file from previous step
 import { colors } from '../../../../theme';
 import { FFT_SIZE } from '../../../../utils/audio';
@@ -61,7 +61,9 @@ type ChatPersonalNavigationParams = {
 
 export default function ChatView() {
   const route = useRoute<RouteProp<ChatRouteParams, 'ChatView'>>();
-  const otherUid = route.params?.id; // receiver uid from route
+  const otherUid = route.params?.id;
+  const otherName = route.params?.name ?? 'Chat';
+  const otherAvatar = route.params?.avatar;
   const isGroup = route.params?.type === 'group';
   const displayName = route.params?.name ?? 'Chat';
   const theme = useTheme();
@@ -197,32 +199,44 @@ export default function ChatView() {
   useLayoutEffect(() => {
     const headerTitle = isSelf
       ? `You (@${meDoc?.username ?? 'you'})`
-      : displayName;
+      : otherName;
 
     const headerSubtitle = isSelf ? '' : presenceText || ' ';
+
+    const avatarUri = isSelf ? meDoc?.photoURL : otherAvatar;
 
     navigation.setOptions({
       headerTitle: () => (
         <List.Item
           title={headerTitle}
           description={headerSubtitle}
-          left={props => (
-            <Avatar.Image
-              {...props}
-              size={40}
-              source={{ uri: meDoc?.photoURL || '' }}
-            />
-          )}
+          left={props =>
+            avatarUri ? (
+              <Avatar.Image {...props} size={40} source={{ uri: avatarUri }} />
+            ) : (
+              <Avatar.Text
+                {...props}
+                size={40}
+                label={(isSelf ? meDoc?.username ?? 'You' : otherName)
+                  .slice(0, 2)
+                  .toUpperCase()}
+              />
+            )
+          }
           onPress={() => {
             if (!isSelf) navigation.navigate('PersonalChatContact');
           }}
         />
       ),
-      // headerRight: () => (
-      //   <Appbar.Action icon="dots-vertical" onPress={() => {}} />
-      // ),
     });
-  }, [navigation, displayName, presenceText, isSelf, meDoc?.username]);
+  }, [
+    navigation,
+    presenceText,
+    isSelf,
+    meDoc?.username,
+    otherName,
+    otherAvatar,
+  ]);
 
   const onPickDocument = useCallback(async () => {
     try {
