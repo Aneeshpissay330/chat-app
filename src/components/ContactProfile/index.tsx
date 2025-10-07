@@ -27,7 +27,7 @@ export default function ContactProfile(props: Props) {
         )}
         {online && <View style={[styles.badge, { borderColor: theme.colors.surface }]} />}
       </View>
-      <Text variant="headlineSmall" style={styles.name}>{name}</Text>
+      <Text variant="headlineSmall" style={styles.name} numberOfLines={1}>{name}</Text>
       <Text style={{ color: theme.colors.secondary, marginBottom: 12 }}>{status}</Text>
 
       <View style={styles.actionsRow}>
@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3CB371',
     borderWidth: 3,
   },
-  name: { fontWeight: '700' },
+  name: { fontWeight: '700', textAlign: 'center' },
   actionsRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
   fab: { marginHorizontal: 6 },
 });

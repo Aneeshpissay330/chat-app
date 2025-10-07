@@ -401,7 +401,6 @@ export async function markChatRead(chatId: string) {
 
     const unread: Record<string, number> = { ...(chat.unread || {}) };
     unread[me] = 0; // I’ve read everything in this chat
-    console.log(unread)
     tx.set(
       chatRef,
       {
@@ -525,7 +524,6 @@ export async function sendVideo(
   },
 ) {
   try {
-    console.log('sendVideo', args, chatId);
     return sendMediaInternal(chatId, {
       kind: 'video',
       localPath: args.localPath,
