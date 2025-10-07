@@ -12,7 +12,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef
+  useRef,
 } from 'react';
 import {
   Alert,
@@ -23,7 +23,7 @@ import {
   ListRenderItem,
   Platform,
   StyleSheet,
-  View
+  View,
 } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
 import { Avatar, IconButton, List, useTheme } from 'react-native-paper';
@@ -54,9 +54,7 @@ import {
 } from '../../../../features/messages';
 import { useAudioRecorder } from '../../../../hooks/useAudioRecorder';
 import { useUserDoc } from '../../../../hooks/useUserDoc';
-import {
-  sendAudio
-} from '../../../../services/chat';
+import { sendAudio } from '../../../../services/chat';
 import { colors } from '../../../../theme';
 import { FFT_SIZE } from '../../../../utils/audio';
 
@@ -117,22 +115,24 @@ export default function ChatView() {
    * Combined: ensure chat, subscribe to messages, subscribe to presence
    * One effect => one subscription teardown
    */
-  useEffect(() => {
-    if (!otherUid) return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!otherUid) return;
 
-    (async () => {
-      try {
-        const { chatId } = await dispatch(openDmChat({ otherUid })).unwrap();
-        await dispatch(startSubscriptions({ otherUid, chatId, isSelf }));
-      } catch (e: any) {
-        Alert.alert('Chat error', e?.message ?? 'Failed to open chat');
-      }
-    })();
+      (async () => {
+        try {
+          const { chatId } = await dispatch(openDmChat({ otherUid })).unwrap();
+          await dispatch(startSubscriptions({ otherUid, chatId, isSelf }));
+        } catch (e: any) {
+          Alert.alert('Chat error', e?.message ?? 'Failed to open chat');
+        }
+      })();
 
-    return () => {
-      dispatch(clearChatState({ otherUid }));
-    };
-  }, [dispatch, otherUid, isSelf]);
+      return () => {
+        dispatch(clearChatState({ otherUid }));
+      };
+    }, [dispatch, otherUid, isSelf]),
+  );
 
   /**
    * Mark read and reset typing on focus/blur of the screen instead of reacting to message changes.

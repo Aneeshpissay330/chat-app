@@ -1,81 +1,84 @@
+// index.tsx
+import React, { useEffect, useMemo } from 'react';
 import {
   ScrollView,
   View,
   Image,
-  TouchableOpacity,
-  Text,
   StyleSheet,
 } from 'react-native';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { List } from 'react-native-paper';
 
+// from messages slice
+import {
+  openDmChat,
+  startSubscriptions,
+  clearChatState,
+  selectChatIdByOther,
+  selectMessagesByOther,
+} from '../../features/messages'; // <- adjust path to your slice
+import { useAppDispatch, useAppSelector } from '../../app/hooks';
+// ^ selectors & thunks come from your messages slice :contentReference[oaicite:3]{index=3}
+
 export type RootTabParamList = {
-  MediaTabsScreen: undefined;
+  MediaTabsScreen: { id: string };
 };
 
-const MediaPreviewRow = () => {
+type MediaPreviewRowProps = {
+  otherUid: string;
+}
+
+const MediaPreviewRow : React.FC<MediaPreviewRowProps> = ({ otherUid }) => {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
 
-  const media = [
-    {
-      id: '1',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-1.jpg',
-    },
-    {
-      id: '2',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg',
-    },
-    {
-      id: '3',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg',
-    },
-    {
-      id: '4',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg',
-    },
-    {
-      id: '5',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-5.jpg',
-    },
-    {
-      id: '6',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg',
-    },
-    {
-      id: '7',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-7.jpg',
-    },
-    {
-      id: '8',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-8.jpg',
-    },
-    {
-      id: '9',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg',
-    },
-    {
-      id: '10',
-      uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-10.jpg',
-    },
-  ];
+  const dispatch = useAppDispatch();
+  const chatId = useAppSelector((s) =>
+    otherUid ? selectChatIdByOther(s, otherUid) : undefined
+  );
+  const msgs = useAppSelector((s) =>
+    otherUid ? selectMessagesByOther(s, otherUid) : []
+  );
+
+  // Ensure chat exists
+  useEffect(() => {
+    if (otherUid && !chatId) {
+      dispatch(openDmChat({ otherUid }) as any);
+    }
+  }, [dispatch, otherUid, chatId]);
+
+  // Start live subscriptions once chatId is known
+  useEffect(() => {
+    if (otherUid && chatId) {
+      // isSelf: false when it’s a DM; tweak if you have a self-chat route
+      dispatch(startSubscriptions({ otherUid, chatId, isSelf: false }) as any);
+      return () => {
+        dispatch(clearChatState({ otherUid }));
+      };
+    }
+  }, [dispatch, otherUid, chatId]);
+
+  // Only images for the row
+  const images = useMemo(
+    () => msgs.filter(m => m.type === 'image' && !!m.url), // m.url is local first, then patched to cloud URL :contentReference[oaicite:4]{index=4}
+    [msgs]
+  );
+
+  if (!otherUid) return null;
 
   return (
     <View>
       <List.Item
         title="Media, links and docs"
         titleStyle={{ fontWeight: 'bold', fontSize: 14 }}
-        right={(p) => <List.Icon {...p} icon="arrow-right" />}
-        onPress={() => navigation.navigate('MediaTabsScreen')}
+        right={p => <List.Icon {...p} icon="arrow-right" />}
+        onPress={() => navigation.navigate('MediaTabsScreen', { id: otherUid })}
       />
-      {/* <List.Subheader style={styles.subheader}>
-        Media, links and docs
-      </List.Subheader> */}
       <View style={styles.rowContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {media.map(item => (
+          {images.map(item => (
             <Image
               key={item.id}
-              source={{ uri: item.uri }}
+              source={{ uri: item.url! }}
               style={styles.image}
             />
           ))}
@@ -97,18 +100,6 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 8,
     marginRight: 8,
-  },
-  seeAll: {
-    fontSize: 24,
-    paddingLeft: 8,
-    color: '#007AFF',
-  },
-  subheader: {
-    fontSize: 16,
-    fontWeight: '600',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
   },
 });
 

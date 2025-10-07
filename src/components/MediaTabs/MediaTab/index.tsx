@@ -1,29 +1,60 @@
-import * as React from 'react';
-import { View, StyleSheet, Image, Dimensions } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { View, StyleSheet, Image, Dimensions, ScrollView } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import type { RootState } from '../../../app/store'; // adjust path to your store
 
-const media = [
-  { id: '1', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-1.jpg' },
-  { id: '2', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg' },
-  { id: '3', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg' },
-  { id: '4', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg' },
-  { id: '5', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-5.jpg' },
-  { id: '6', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg' },
-  { id: '7', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-7.jpg' },
-  { id: '8', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-8.jpg' },
-  { id: '9', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg' },
-  { id: '10', uri: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-10.jpg' },
-];
+import {
+  openDmChat,
+  startSubscriptions,
+  clearChatState,
+  selectChatIdByOther,
+  selectMessagesByOther,
+} from '../../../features/messages'; // adjust path to your slice
 
 const { width } = Dimensions.get('window');
-const IMAGE_SIZE = (width - 16 * 2 - 8 * 2) / 3; // 3 columns with 8px gaps and 16px padding
+const IMAGE_SIZE = (width - 16 * 2 - 8 * 2) / 3;
 
-export default function MediaTab() {
+type MediaTabProps = {
+  otherUid: string;
+}
+
+const MediaTab : React.FC<MediaTabProps> = ({ otherUid }) => {
+  const dispatch = useDispatch();
+
+  const chatId = useSelector((s: RootState) =>
+    otherUid ? selectChatIdByOther(s, otherUid) : undefined
+  );
+  const msgs = useSelector((s: RootState) =>
+    otherUid ? selectMessagesByOther(s, otherUid) : []
+  );
+
+  useEffect(() => {
+    if (otherUid && !chatId) {
+      dispatch(openDmChat({ otherUid }) as any);
+    }
+  }, [dispatch, otherUid, chatId]);
+
+  useEffect(() => {
+    if (otherUid && chatId) {
+      dispatch(startSubscriptions({ otherUid, chatId, isSelf: false }) as any);
+      return () => {
+        dispatch(clearChatState({ otherUid }));
+      };
+    }
+  }, [dispatch, otherUid, chatId]);
+
+  const images = useMemo(
+    () => msgs.filter(m => m.type === 'image' && !!m.url),
+    [msgs]
+  );
+
   return (
-    <View style={styles.grid}>
-      {media.map((item) => (
-        <Image key={item.id} source={{ uri: item.uri }} style={styles.cell} />
+    <ScrollView contentContainerStyle={styles.grid}>
+      {images.map((item) => (
+        <Image key={item.id} source={{ uri: item.url! }} style={styles.cell} />
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -43,3 +74,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e5e5',
   },
 });
+
+export default MediaTab;

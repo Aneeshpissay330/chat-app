@@ -57,7 +57,7 @@ export default function PersonalChatContact() {
           </>
         )}
 
-        <MediaPreviewRow />
+        <MediaPreviewRow otherUid={otherUid} />
         <Divider />
         <ChatSettings
           notificationsEnabled
