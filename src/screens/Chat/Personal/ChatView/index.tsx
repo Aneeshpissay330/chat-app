@@ -12,8 +12,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
-  useState,
+  useRef
 } from 'react';
 import {
   Alert,
@@ -24,8 +23,7 @@ import {
   ListRenderItem,
   Platform,
   StyleSheet,
-  TouchableWithoutFeedback,
-  View,
+  View
 } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
 import { Avatar, IconButton, List, useTheme } from 'react-native-paper';
@@ -33,24 +31,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../../../components/ChatBubble';
 import ChatInput from '../../../../components/ChatInput';
 import { useKeyboardStatus } from '../../../../hooks/useKeyboardStatus';
-import type { Message, SendPayload } from '../../../../types/chat';
+import type { Message } from '../../../../types/chat';
 
 import auth from '@react-native-firebase/auth';
 import RNFS from 'react-native-fs';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
 import { FrequencyChart } from '../../../../components/FrequencyChart';
+import {
+  clearChatState,
+  markReadNow,
+  openDmChat,
+  selectChatIdByOther,
+  selectMessagesByOther,
+  selectMsgStatusByOther,
+  selectPresenceByOther,
+  sendFileNow,
+  sendImageNow,
+  sendTextNow,
+  sendVideoNow,
+  setTypingNow,
+  startSubscriptions,
+} from '../../../../features/messages';
 import { useAudioRecorder } from '../../../../hooks/useAudioRecorder';
 import { useUserDoc } from '../../../../hooks/useUserDoc';
 import {
-  ensureDMChat,
-  markChatRead,
-  sendAudio,
-  sendFile,
-  sendImage,
-  sendText,
-  sendVideo,
-  setTyping,
-  subscribeMessages,
-  subscribePresence,
+  sendAudio
 } from '../../../../services/chat';
 import { colors } from '../../../../theme';
 import { FFT_SIZE } from '../../../../utils/audio';
@@ -65,30 +70,47 @@ type ChatPersonalNavigationParams = {
 };
 
 export default function ChatView() {
+  //Theming
+  const theme = useTheme();
+  // Routing / params
   const route = useRoute<RouteProp<ChatRouteParams, 'ChatView'>>();
+  const navigation =
+    useNavigation<StackNavigationProp<ChatPersonalNavigationParams>>();
   const otherUid = route.params?.id;
   const otherName = route.params?.name ?? 'Chat';
   const otherAvatar = route.params?.avatar;
   const isGroup = route.params?.type === 'group';
-  const theme = useTheme();
-  const navigation =
-    useNavigation<StackNavigationProp<ChatPersonalNavigationParams>>();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [presenceText, setPresenceText] = useState<string>('');
+
   const listRef = useRef<FlatList<Message>>(null);
-  const isKeyboardOpen = useKeyboardStatus();
+
+  // Me
+  const me = auth().currentUser?.uid;
   const { userDoc: meDoc } = useUserDoc();
 
-  const me = auth().currentUser?.uid;
+  // Redux
+  const dispatch = useAppDispatch();
+  const messages = useAppSelector(s => selectMessagesByOther(s, otherUid));
+  const chatId = useAppSelector(s => selectChatIdByOther(s, otherUid));
+  const presenceText = useAppSelector(s => selectPresenceByOther(s, otherUid));
+  const msgStatus = useAppSelector(s => selectMsgStatusByOther(s, otherUid));
+
+  // UI env (for header offsets if you later add KeyboardAvoidingView)
+  const isKeyboardOpen = useKeyboardStatus();
   const headerHeight = useHeaderHeight();
+  const keyboardOffset = !isKeyboardOpen
+    ? headerHeight
+    : headerHeight - Dimensions.get('window').height * 0.04;
 
-  const isSelf = useMemo(() => otherUid === me || otherUid === 'me', [otherUid, me]);
+  // Derived
+  const isSelf = useMemo(
+    () => otherUid === me || otherUid === 'me',
+    [otherUid, me],
+  );
 
-  // A ref to always have the latest chatId in cleanups without depending the effect
-  const chatIdRef = useRef<string | null>(null);
+  // Latest chatId for async/cleanup
+  const chatIdRef = useRef<string | undefined>(chatId ?? undefined);
   useEffect(() => {
-    chatIdRef.current = chatId;
+    chatIdRef.current = chatId ?? undefined;
   }, [chatId]);
 
   /**
@@ -98,76 +120,35 @@ export default function ChatView() {
   useEffect(() => {
     if (!otherUid) return;
 
-    let isActive = true;
-    let unsubMsgs: undefined | (() => void);
-    let unsubPresence: undefined | (() => void);
-
     (async () => {
       try {
-        const id = await ensureDMChat(otherUid);
-        if (!isActive) return;
-        setChatId(id);
-
-        // Messages subscription
-        unsubMsgs = subscribeMessages(id, (docs) => {
-          const mapped: Message[] = docs.map((d) => ({
-            id: d.id,
-            text: d.text,
-            createdAt: d.createdAt.toDate().toISOString(),
-            userId: d.senderId,
-            url: d.url,
-            type: d.type,
-            width: d.width,
-            height: d.height,
-            size: d.size,
-            name: d.name,
-            mime: d.mime,
-          }));
-          setMessages(mapped);
-        });
-
-        // Presence subscription (skip self)
-        if (!isSelf) {
-          unsubPresence = subscribePresence(otherUid, (isOnline, lastActive) => {
-            if (isOnline) {
-              setPresenceText('Online');
-            } else if (lastActive) {
-              const mins = Math.max(1, Math.round((Date.now() - lastActive.getTime()) / 60000));
-              setPresenceText(`Last seen ${mins}m ago`);
-            } else {
-              setPresenceText('Offline');
-            }
-          });
-        } else {
-          setPresenceText('');
-        }
+        const { chatId } = await dispatch(openDmChat({ otherUid })).unwrap();
+        await dispatch(startSubscriptions({ otherUid, chatId, isSelf }));
       } catch (e: any) {
         Alert.alert('Chat error', e?.message ?? 'Failed to open chat');
       }
     })();
 
     return () => {
-      isActive = false;
-      unsubMsgs?.();
-      unsubPresence?.();
+      dispatch(clearChatState({ otherUid }));
     };
-  }, [otherUid, isSelf]);
+  }, [dispatch, otherUid, isSelf]);
 
   /**
    * Mark read and reset typing on focus/blur of the screen instead of reacting to message changes.
    */
   useFocusEffect(
     useCallback(() => {
-      if (!chatIdRef.current) return;
-      // On focus
-      markChatRead(chatIdRef.current);
-      setTyping(chatIdRef.current, false);
-
-      // On blur/cleanup
+      const id = chatIdRef.current;
+      if (id) {
+        dispatch(markReadNow({ chatId: id }));
+        dispatch(setTypingNow({ chatId: id, typing: false }));
+      }
       return () => {
-        if (chatIdRef.current) setTyping(chatIdRef.current, false);
+        const id2 = chatIdRef.current;
+        if (id2) dispatch(setTypingNow({ chatId: id2, typing: false }));
       };
-    }, [])
+    }, [dispatch, chatIdRef.current]),
   );
 
   const renderItem: ListRenderItem<Message> = useCallback(
@@ -183,29 +164,29 @@ export default function ChatView() {
         />
       );
     },
-    [messages, me, isGroup]
+    [messages, me, isGroup],
   );
 
   const keyExtractor = useCallback((m: Message) => m.id, []);
 
   const onSend = useCallback(
-    async (payload: SendPayload) => {
-      try {
-        let currentChatId = chatIdRef.current;
-        if (!currentChatId) return;
-        await sendText(currentChatId, payload.text || '');
-        listRef.current?.scrollToOffset({ animated: true, offset: 0 });
-      } catch (e: any) {
-        Alert.alert('Send failed', e?.message ?? 'Please try again.');
-      }
+    async (text: string) => {
+      const id = chatIdRef.current;
+      if (!id) return;
+      await dispatch(sendTextNow({ chatId: id, text }));
+      // you can scroll list to top in your render layer
+      listRef.current?.scrollToOffset({ animated: true, offset: 0 });
     },
-    []
+    [dispatch],
   );
 
-  const onTyping = useCallback((typing: boolean) => {
-    const id = chatIdRef.current;
-    if (id) setTyping(id, typing);
-  }, []);
+  const onTyping = useCallback(
+    (typing: boolean) => {
+      const id = chatIdRef.current;
+      if (id) dispatch(setTypingNow({ chatId: id, typing }));
+    },
+    [dispatch],
+  );
 
   const onPickDocument = useCallback(async () => {
     try {
@@ -214,16 +195,19 @@ export default function ChatView() {
       const id = chatIdRef.current;
       if (!id) return;
 
-      await sendFile(id, {
-        localPath: doc.uri,
-        mime: doc.type || 'application/octet-stream',
-        size: doc.size || 0,
-        name: doc.name || 'document',
-      });
+      await dispatch(
+        sendFileNow({
+          chatId: id,
+          localPath: doc.uri,
+          mime: doc.type || 'application/octet-stream',
+          size: doc.size || 0,
+          name: doc.name || 'document',
+        }),
+      );
     } catch (error) {
-      console.log('Document picker error or cancelled', error);
+      // picker cancelled or failed
     }
-  }, []);
+  }, [dispatch]);
 
   const onOpenCamera = useCallback(() => {
     navigation.navigate('CameraScreen', { id: otherUid });
@@ -236,36 +220,41 @@ export default function ChatView() {
         cropping: false,
       });
       const id = chatIdRef.current;
-      if (!id) return;
+      if (!id || !media?.mime) return;
 
-      if (media?.mime?.startsWith('image/')) {
-        await sendImage(id, {
-          localPath: media.path,
-          mime: media.mime,
-          width: media.width,
-          height: media.height,
-          size: media.size,
-        });
+      if (media.mime.startsWith('image/')) {
+        await dispatch(
+          sendImageNow({
+            chatId: id,
+            localPath: media.path,
+            mime: media.mime,
+            width: media.width,
+            height: media.height,
+            size: media.size,
+          }),
+        );
         return;
       }
-
-      if (media?.mime?.startsWith('video/')) {
-        await sendVideo(id, {
-          localPath: media.path,
-          mime: media.mime,
-          width: media.width,
-          height: media.height,
-          size: media.size,
-          durationMs: typeof media.duration === 'number' ? media.duration : undefined,
-        });
+      if (media.mime.startsWith('video/')) {
+        await dispatch(
+          sendVideoNow({
+            chatId: id,
+            localPath: media.path,
+            mime: media.mime,
+            width: media.width,
+            height: media.height,
+            size: media.size,
+            durationMs:
+              typeof media.duration === 'number' ? media.duration : undefined,
+          }),
+        );
         return;
       }
-
-      console.log('Unsupported media from gallery:', media?.mime);
+      // unsupported type -> ignore silently
     } catch (error) {
-      console.log('Gallery error or cancelled', error);
+      // gallery cancelled or failed
     }
-  }, []);
+  }, [dispatch]);
 
   const { start, stop, isRecording, freqs, filePath, togglePause, isPaused } =
     useAudioRecorder({
@@ -298,11 +287,16 @@ export default function ChatView() {
   // Header values memoized so useLayoutEffect only runs when inputs truly change
   const headerTitle = useMemo(
     () => (isSelf ? `You (@${meDoc?.username ?? 'you'})` : otherName),
-    [isSelf, meDoc?.username, otherName]
+    [isSelf, meDoc?.username, otherName],
   );
-
-  const headerSubtitle = useMemo(() => (isSelf ? '' : presenceText || ' '), [isSelf, presenceText]);
-  const avatarUri = useMemo(() => (isSelf ? meDoc?.photoURL : otherAvatar), [isSelf, meDoc?.photoURL, otherAvatar]);
+  const headerSubtitle = useMemo(
+    () => (isSelf ? '' : presenceText || ' '),
+    [isSelf, presenceText],
+  );
+  const avatarUri = useMemo(
+    () => (isSelf ? meDoc?.photoURL : otherAvatar),
+    [isSelf, meDoc?.photoURL, otherAvatar],
+  );
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -310,7 +304,7 @@ export default function ChatView() {
         <List.Item
           title={headerTitle}
           description={headerSubtitle}
-          left={(props) =>
+          left={props =>
             avatarUri ? (
               <Avatar.Image {...props} size={40} source={{ uri: avatarUri }} />
             ) : (
@@ -324,12 +318,22 @@ export default function ChatView() {
             )
           }
           onPress={() => {
-            if (!isSelf) navigation.navigate('PersonalChatContact', { id: otherUid });
+            if (!isSelf)
+              navigation.navigate('PersonalChatContact', { id: otherUid });
           }}
         />
       ),
     });
-  }, [navigation, headerTitle, headerSubtitle, avatarUri, isSelf, otherUid, meDoc?.username, otherName]);
+  }, [
+    navigation,
+    headerTitle,
+    headerSubtitle,
+    avatarUri,
+    isSelf,
+    otherUid,
+    meDoc?.username,
+    otherName,
+  ]);
 
   return (
     <SafeAreaView
@@ -345,62 +349,65 @@ export default function ChatView() {
             : headerHeight - Dimensions.get('window').height * 0.04
         }
       >
-          <View style={{ flex: 1 }}>
-            <FlatList
-              ref={listRef}
-              data={messages}
-              inverted
-              keyExtractor={keyExtractor}
-              renderItem={renderItem}
-              contentContainerStyle={{ paddingVertical: 8 }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode='on-drag'
-              onScrollBeginDrag={() => Keyboard.dismiss()}
-              style={{ flex: 1 }}
-              maintainVisibleContentPosition={{
-                minIndexForVisible: 0,
-                autoscrollToTopThreshold: 10,
-              }}
-            />
-            {isRecording ? (
-              <View style={{ flex: 1, maxHeight: 140 }}>
-                <FrequencyChart data={freqs} dataSize={FFT_SIZE / 2} />
-                <View
-                  style={{
-                    justifyContent: 'space-between',
-                    columnGap: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                  }}
-                >
-                  <IconButton icon="trash-can-outline" onPress={onCancelRecording} />
-                  <IconButton
-                    icon={!isPaused ? 'pause' : 'microphone-outline'}
-                    iconColor="red"
-                    size={30}
-                    onPress={togglePause}
-                  />
-                  <IconButton
-                    icon="send-circle"
-                    iconColor={colors.primary}
-                    size={45}
-                    onPress={onSendRecording}
-                  />
-                </View>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            ref={listRef}
+            data={messages}
+            inverted
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingVertical: 8 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={() => Keyboard.dismiss()}
+            style={{ flex: 1 }}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
+          />
+          {isRecording ? (
+            <View style={{ flex: 1, maxHeight: 140 }}>
+              <FrequencyChart data={freqs} dataSize={FFT_SIZE / 2} />
+              <View
+                style={{
+                  justifyContent: 'space-between',
+                  columnGap: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                }}
+              >
+                <IconButton
+                  icon="trash-can-outline"
+                  onPress={onCancelRecording}
+                />
+                <IconButton
+                  icon={!isPaused ? 'pause' : 'microphone-outline'}
+                  iconColor="red"
+                  size={30}
+                  onPress={togglePause}
+                />
+                <IconButton
+                  icon="send-circle"
+                  iconColor={colors.primary}
+                  size={45}
+                  onPress={onSendRecording}
+                />
               </View>
-            ) : (
-              <ChatInput
-                onSend={onSend}
-                onPickDocument={onPickDocument}
-                onOpenCamera={onOpenCamera}
-                onOpenGallery={onOpenGallery}
-                onRecordAudio={onRecordAudio}
-                onTyping={onTyping}
-              />
-            )}
-          </View>
+            </View>
+          ) : (
+            <ChatInput
+              onSend={onSend}
+              onPickDocument={onPickDocument}
+              onOpenCamera={onOpenCamera}
+              onOpenGallery={onOpenGallery}
+              onRecordAudio={onRecordAudio}
+              onTyping={onTyping}
+            />
+          )}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

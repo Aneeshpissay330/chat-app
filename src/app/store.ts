@@ -2,16 +2,20 @@ import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistReducer, persistStore } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import contactsReducer from '../features/contacts';
+import chatReducer from '../features/chat';
+import messageReducer from '../features/messages';
 
 const rootReducer = combineReducers({
   contacts: contactsReducer,
+  chats: chatReducer,
+  messages: messageReducer
   // add more slices here (e.g., auth)
 });
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['contacts'], // persist contacts slice
+  whitelist: ['contacts', 'chats', 'messages'], // persist contacts slice
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

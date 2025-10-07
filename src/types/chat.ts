@@ -24,3 +24,16 @@ export type SendPayload = {
   image?: { uri: string };
   audio?: { uri: string; duration?: number };
 };
+
+// types/chat.ts
+
+export type ChatRow = {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage: string;
+  date: string;
+  unreadCount: number;
+  pinned: boolean;
+  online: boolean;
+};

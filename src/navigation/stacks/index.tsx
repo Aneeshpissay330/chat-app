@@ -38,6 +38,7 @@ function Stacks() {
       <Stack.Screen
         name="PersonalChatContact"
         component={PersonalChatContact}
+        options={{ title: '' }}
       />
        <Stack.Screen
         name="GroupChatContact"

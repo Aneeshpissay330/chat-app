@@ -2,11 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { EmojiPopup } from 'react-native-emoji-popup';
 import { IconButton, TextInput, useTheme } from 'react-native-paper';
-import type { SendPayload } from '../../types/chat';
 import AttachmentSheet from '../AttachmentSheet';
 
 type Props = {
-  onSend: (payload: SendPayload) => void;
+  onSend: (text: string) => void;
   onPickDocument: () => Promise<void> | void;
   onOpenCamera: () => Promise<void> | void;
   onOpenGallery: () => Promise<void> | void;
@@ -30,7 +29,7 @@ export default function ChatInput({
 
   const handleSend = () => {
     if (!text.trim()) return;
-    onSend({ text: text.trim() });
+    onSend(text.trim());
     setText('');
     setShowEmojiPopup(false);
   };
