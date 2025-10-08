@@ -245,7 +245,7 @@ export default function ChatView() {
       await dispatch(
         sendFileNow({
           chatId: id,
-          localPath: `file:/${localPath}`,
+          localPath: `file://${localPath}`,
           mime: doc.type || 'application/octet-stream',
           size: doc.size || 0,
           name: doc.name || 'document',
