@@ -12,20 +12,8 @@ import {
   sendAudio,
   sendFile,
 } from '../../services/chat';
-
-export type Message = {
-  id: string;
-  text?: string;
-  createdAt: string;
-  userId: string;
-  type?: 'text' | 'image' | 'video' | 'audio' | 'file';
-  url?: string;
-  width?: number;
-  height?: number;
-  size?: number;
-  name?: string;
-  mime?: string;
-};
+import { downloadFileToCache } from '../../utils/download'; // <- new import
+import { Message } from '../../types/chat';
 
 type ChatState = {
   chatId?: string;
@@ -58,28 +46,163 @@ export const startSubscriptions = createAsyncThunk<
 >(
   'messages/startSubscriptions',
   async ({ otherUid, chatId, isSelf }, thunkApi) => {
-    // cleanup old
-    unsubMap[otherUid]?.msgs?.();
-    unsubMap[otherUid]?.presence?.();
+    // cleanup previous subscriptions
+    try {
+      unsubMap[otherUid]?.msgs?.();
+      unsubMap[otherUid]?.presence?.();
+    } catch (e) {
+      // ignore cleanup errors
+    }
 
     unsubMap[otherUid] = {};
+
+    // ...existing code...
     unsubMap[otherUid].msgs = subscribeMessages(chatId, docs => {
-      const mapped: Message[] = docs.map(d => ({
-        id: d.id,
-        text: d.text,
-        createdAt: d.createdAt.toDate().toISOString(),
-        userId: d.senderId,
-        type: d.type,
-        url: d.url,
-        width: d.width,
-        height: d.height,
-        size: d.size,
-        name: d.name,
-        mime: d.mime,
-      }));
+      // helpers for URL detection (leave these as-is)
+      const isRemoteUrl = (u?: string) =>
+        typeof u === 'string' && /^https?:\/\//i.test(u);
+
+      // Treat file:// coming from Firestore as NOT-local for remote users
+      // (don't expose into Redux). However, for the local user (isSelf)
+      // we should treat file:// as local so the sender sees their own image
+      // immediately. Consider content://, data:, file:// (when isSelf),
+      // or absolute paths (starting with /) as local.
+      const isLocalPath = (u?: string, senderId?: string) =>
+        typeof u === 'string' &&
+        (u.startsWith('content://') ||
+          u.startsWith('data:') ||
+          // treat file:// as local when this subscription belongs to the sender
+          // or when the message sender is not the `otherUid` (i.e. it's from
+          // the current user in a DM). This makes the behavior robust if
+          // `isSelf` isn't reliably passed.
+          ((isSelf || (senderId && senderId !== otherUid)) && u.startsWith('file://')) ||
+          // absolute paths like /storage/emulated/...
+          /^\//.test(u));
+
+      // --- NEW: grab any existing messages from Redux for this otherUid ---
+      const state = thunkApi.getState() as RootState;
+      const reduxMessages = state.messages.byOtherUid[otherUid]?.messages ?? [];
+      // build a quick lookup: messageId -> localPath
+      const reduxLocalMap: Record<string, string | undefined> = {};
+      for (const rm of reduxMessages) {
+        if (rm.localPath) reduxLocalMap[rm.id] = rm.localPath;
+      }
+
+      // Map firestore docs -> internal Message shape
+      const mapped = docs.map(d => {
+        const rawUrl = typeof d.url === 'string' ? d.url : undefined;
+
+        // if Redux already has localPath for this message id, use that and never attempt download
+        const reduxLocal = reduxLocalMap[d.id];
+
+        // only treat as local if reduxLocal exists OR url matches content://, data:, or absolute path
+  const alreadyLocal = !!reduxLocal || isLocalPath(rawUrl, d.senderId);
+        // if alreadyLocal is true we will prefer reduxLocal (if present) else rawUrl
+        const chosenLocalPath =
+          reduxLocal ?? (alreadyLocal ? rawUrl : undefined);
+
+        // Only mark for download if:
+        // - we do not have a local path (redux or local url)
+        // - AND the stored url looks like a remote HTTP(S) URL
+        const needsDownload = !chosenLocalPath && isRemoteUrl(rawUrl);
+
+  // Expose remote HTTP(S) URLs for immediate preview only for images/videos
+  // so receivers can see the media while we download and cache it.
+  // For other types we keep the previous behavior (hide remote until cached).
+  const exposeRemoteForPreview = isRemoteUrl(rawUrl) && (d.type === 'image' || d.type === 'video');
+  const urlToStore = chosenLocalPath ?? (exposeRemoteForPreview ? rawUrl : undefined);
+  // Keep remoteUrl for the downloader to use (download still happens if needed)
+  const remoteUrl = needsDownload ? rawUrl : undefined;
+
+        return {
+          id: d.id,
+          text: d.text,
+          createdAt: d.createdAt.toDate().toISOString(),
+          userId: d.senderId,
+          type: d.type,
+          url: urlToStore,
+          // prefer reduxLocal if present, otherwise set localPath only when rawUrl was local
+          localPath: chosenLocalPath ? chosenLocalPath : undefined,
+          // keep remoteUrl for the downloader; UI/Redux won't expose remote http(s) urls until downloaded
+          remoteUrl,
+          // If we already have local path, mark 'idle'; else 'pending' only if remote
+          downloadStatus: chosenLocalPath
+            ? 'idle'
+            : needsDownload
+            ? 'pending'
+            : 'idle',
+          width: d.width,
+          height: d.height,
+          size: d.size,
+          name: d.name,
+          mime: d.mime,
+        } as any;
+      });
+
+      // Immediately dispatch so UI can render messages and per-message loaders
       thunkApi.dispatch(setMessages({ otherUid, messages: mapped }));
+
+      // Fire-and-forget sequential downloader for messages that have remote URLs
+      (async () => {
+        // Only process messages that are pending AND actually remote (use remoteUrl field)
+        const toDownload = mapped.filter(
+          m => m.downloadStatus === 'pending' && m.remoteUrl,
+        );
+
+        for (const msg of toDownload) {
+          // mark downloading (so chat bubble shows spinner)
+          thunkApi.dispatch(
+            updateMessage({
+              otherUid,
+              id: msg.id,
+              patch: { downloadStatus: 'downloading' as const },
+            }),
+          );
+
+          try {
+            const filename = msg.name || `${msg.id}`;
+
+            // downloadFileToCache MUST accept only remote http(s) URLs
+            const localUri = await downloadFileToCache({
+              url: msg.remoteUrl!, // use remoteUrl saved for download
+              filename,
+            });
+
+            // update the message with local path and mark done
+            thunkApi.dispatch(
+              updateMessage({
+                otherUid,
+                id: msg.id,
+                patch: {
+                  downloadStatus: 'done' as const,
+                  localPath: localUri,
+                  url: localUri, // replace url so UI consumes local path directly
+                },
+              }),
+            );
+          } catch (err: any) {
+            console.warn(
+              'Message download failed',
+              msg.id,
+              err?.message ?? err,
+            );
+            thunkApi.dispatch(
+              updateMessage({
+                otherUid,
+                id: msg.id,
+                patch: { downloadStatus: 'failed' as const },
+              }),
+            );
+          }
+
+          // small await to yield to the event loop / UI
+          // eslint-disable-next-line no-await-in-loop
+          await Promise.resolve();
+        }
+      })();
     });
 
+    // presence subscription (unchanged)
     if (!isSelf) {
       unsubMap[otherUid].presence = subscribePresence(
         otherUid,
@@ -205,6 +328,21 @@ const slice = createSlice({
       s.presenceText = action.payload.presenceText;
       state.byOtherUid[action.payload.otherUid] = s as ChatState;
     },
+    updateMessage(
+      state,
+      action: PayloadAction<{
+        otherUid: string;
+        id: string;
+        patch: Partial<Message>;
+      }>,
+    ) {
+      const { otherUid, id, patch } = action.payload;
+      const chat = state.byOtherUid[otherUid];
+      if (!chat) return;
+      const idx = chat.messages.findIndex(m => m.id === id);
+      if (idx === -1) return;
+      chat.messages[idx] = { ...chat.messages[idx], ...patch };
+    },
     clearChatState(state, action) {
       const key = action.payload.otherUid;
       unsubMap[key]?.msgs?.();
@@ -214,7 +352,7 @@ const slice = createSlice({
     },
   },
   extraReducers: b => {
-       b.addCase(openDmChat.pending, (state, action) => {
+    b.addCase(openDmChat.pending, (state, action) => {
       const otherUid = (action.meta.arg as any).otherUid;
       const existing = state.byOtherUid[otherUid];
       if (!existing) {
@@ -253,7 +391,8 @@ const slice = createSlice({
   },
 });
 
-export const { setMessages, setPresence, clearChatState } = slice.actions;
+export const { setMessages, setPresence, clearChatState, updateMessage } =
+  slice.actions;
 
 export const selectChatIdByOther = (s: RootState, otherUid: string) =>
   s.messages.byOtherUid[otherUid]?.chatId;

@@ -133,7 +133,9 @@ export default function ChatView() {
       };
     }, [dispatch, otherUid, isSelf]),
   );
-
+  useEffect(() => {
+    console.log('messages changed', messages);
+  }, [messages]);
   /**
    * Mark read and reset typing on focus/blur of the screen instead of reacting to message changes.
    */

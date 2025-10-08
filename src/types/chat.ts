@@ -1,21 +1,17 @@
 export type Message = {
   id: string;
   text?: string;
-  createdAt: string; // ISO string
+  createdAt: string;
   userId: string;
-  userName?: string;
-  userAvatar?: string;
-  // Optional attachments
-  fileName?: string;
-  fileSizeLabel?: string; // e.g. "2.4 MB"
-  fileType?: 'image' | 'pdf' | 'doc' | 'zip' | 'excel' | 'txt' | 'audio';
-  url?: string; // download URL for the file/image/audio
-  type?: string;
-  width?: number;  // for image
-  height?: number; // for image
-  size?: number;   // for file
-  name?: string;  // original filename if any
-  mime?: string;  // MIME type if any
+  type?: 'text' | 'image' | 'video' | 'audio' | 'file';
+  url?: string; // original/remote url or local file path after download
+  localPath?: string; // local filesystem path if downloaded
+  downloadStatus?: 'idle' | 'pending' | 'downloading' | 'done' | 'failed';
+  width?: number;
+  height?: number;
+  size?: number;
+  name?: string;
+  mime?: string;
 };
 
 export type SendPayload = {

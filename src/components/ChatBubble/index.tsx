@@ -1,3 +1,4 @@
+// src/components/ChatBubble/index.tsx
 import React from 'react';
 import {
   Alert,
@@ -6,18 +7,20 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
-import { Icon, Text, useTheme } from 'react-native-paper';
-import { Message } from '../../types/chat';
-import { formatChatDate } from '../../utils/date';
+import { Text, IconButton } from 'react-native-paper';
 import Video from 'react-native-video';
 import AudioFilePlayer from '../AudioFilePlayer';
+import type { Message } from '../../types/chat'; // <- use your Message type (adjust path if needed)
+import { useUserDoc } from '../../hooks/useUserDoc';
 
 type Props = {
   message: Message;
   isMe: boolean;
   showAvatar?: boolean;
-  showName?: boolean; // show sender name (use for group chats on non-me messages)
+  showName?: boolean;
+  onRetry?: (messageId: string) => void; // optional retry handler
 };
 
 function fitDims(
@@ -36,28 +39,32 @@ export default function ChatBubble({
   isMe,
   showAvatar = !isMe,
   showName = false,
+  onRetry,
 }: Props) {
-  const theme = useTheme();
+  const bubbleBg = isMe ? '#0b93f6' : '#fff';
+  const textColor = isMe ? '#fff' : '#111';
+  const borderColor = '#e5e7eb';
+  const nameColor = isMe ? 'rgba(255,255,255,0.9)' : '#6b7280';
+  const { userDoc } = useUserDoc();
 
-  const bubbleBg = isMe
-    ? theme.colors.primary
-    : theme.dark
-    ? theme.colors.surface
-    : '#fff';
+  const isDownloading =
+    message.downloadStatus === 'pending' ||
+    message.downloadStatus === 'downloading';
+  const isFailed = message.downloadStatus === 'failed';
 
-  const textColor = isMe
-    ? '#fff'
-    : theme.dark
-    ? theme.colors.onSurface
-    : '#1f2937';
+  // prefer localPath if available, else remote url
+  const mediaUri = message.localPath || message.url;
 
-  const borderColor = theme.dark ? '#4b5563' : '#e5e7eb';
-  const nameColor = isMe ? 'rgba(255,255,255,0.85)' : '#6b7280';
-  async function openAttachment(url?: string) {
+  async function openAttachment(uri?: string) {
     try {
-      if (!url) return;
-      const can = await Linking.canOpenURL(url);
-      await Linking.openURL(url); // try anyway; canOpenURL can be flaky for http(s)
+      if (!uri) return;
+      const can = await Linking.canOpenURL(uri);
+      if (can) {
+        await Linking.openURL(uri);
+      } else {
+        // fallback: still try to open
+        await Linking.openURL(uri);
+      }
     } catch (e) {
       Alert.alert(
         'Cannot open file',
@@ -65,26 +72,23 @@ export default function ChatBubble({
       );
     }
   }
-  function isDocLike(mime?: Message['mime']) {
-    // Everything that is NOT image/video/audio is treated as a document/file card
-    if (mime?.includes('application/')) return true;
+
+  function isDocLike(mime?: string) {
     if (!mime) return false;
     if (mime.startsWith('image/')) return false;
     if (mime.startsWith('video/')) return false;
     if (mime.startsWith('audio/')) return false;
     return true;
   }
+
   return (
     <View
       style={[styles.row, { justifyContent: isMe ? 'flex-end' : 'flex-start' }]}
     >
-      {!isMe && showAvatar && message.userAvatar ? (
-        <Image source={{ uri: message.userAvatar }} style={styles.avatar} />
-      ) : !isMe && showAvatar ? (
+      {/* optional avatar placeholder */}
+      {!isMe && showAvatar ? (
         <View style={[styles.avatar, { backgroundColor: '#ddd' }]} />
-      ) : (
-        null
-      )}
+      ) : null}
 
       <View style={{ maxWidth: '78%' }}>
         <View
@@ -100,69 +104,53 @@ export default function ChatBubble({
           ]}
         >
           {/* Sender name (group chats) */}
-          {showName && message.userName ? (
+          {showName ? (
             <Text
               variant="labelSmall"
               style={{ marginBottom: 2, color: nameColor }}
             >
-              {message.userName}
+              {message.userId}
             </Text>
           ) : null}
 
-          {/* File attachment header */}
-          {message.fileName ? (
-            <View style={{ marginBottom: message.text ? 8 : 0 }}>
-              <View style={styles.fileRow}>
-                <View style={styles.fileIconWrap}>
-                  <Icon
-                    source={fileIconFor(message.fileType)}
-                    size={20}
-                    color={isMe ? '#fff' : theme.colors.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="bodyMedium"
-                    style={{ color: textColor, fontWeight: '600' }}
-                  >
-                    {message.fileName}
-                  </Text>
-                  {message.fileSizeLabel ? (
-                    <Text
-                      variant="labelSmall"
-                      style={{
-                        color: isMe ? 'rgba(255,255,255,0.8)' : '#6b7280',
-                      }}
-                    >
-                      {message.fileSizeLabel}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          {message.type === 'image' && message.url ? (
+          {/* Image */}
+          {message.type === 'image' ? (
             <View style={{ marginBottom: 8 }}>
-              <Image
-                source={{ uri: message.url }}
-                style={{
-                  width:
-                    message.width && message.width < 200 ? message.width : 200,
-                  height:
-                    message.height && message.height < 200
-                      ? message.height
-                      : 200,
-                  borderRadius: 10,
-                  backgroundColor: '#e5e7eb',
-                }}
-                resizeMode="cover"
-              />
+              {(() => {
+                const { width, height } = fitDims(
+                  message.width,
+                  message.height,
+                  200,
+                  200,
+                );
+
+                // always show a box — even if no uri and not downloading yet
+                return (
+                  <View style={[styles.mediaBox, { width, height }]}>
+                    {mediaUri ? (
+                      <Image
+                        source={{ uri: mediaUri }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.mediaPlaceholder}>
+                        <ActivityIndicator size={32} />
+                      </View>
+                    )}
+                    {isDownloading ? (
+                      <View style={styles.mediaOverlay}>
+                        <ActivityIndicator size={32} />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })()}
             </View>
           ) : null}
 
-          {/* Video preview if type = video */}
-          {message.type === 'video' && message.url ? (
+          {/* Video */}
+          {message.type === 'video' && (mediaUri || isDownloading) ? (
             <View style={{ marginBottom: 8 }}>
               {(() => {
                 const { width, height } = fitDims(
@@ -173,24 +161,48 @@ export default function ChatBubble({
                 );
                 return (
                   <View
-                    style={{
-                      width,
-                      height,
-                      borderRadius: 10,
-                      overflow: 'hidden',
-                      backgroundColor: '#111',
-                    }}
+                    style={[
+                      styles.mediaBox,
+                      { width, height, backgroundColor: '#000' },
+                    ]}
                   >
-                    <Video
-                      source={{ uri: message.url }}
-                      style={{ width: '100%', height: '100%' }}
-                      controls
-                      paused
-                      resizeMode="cover"
-                      // You can pass a poster/thumbnail url if you store it:
-                      // poster={message.thumbUrl}
-                      // muted // uncomment if you want default muted
-                    />
+                    {mediaUri ? (
+                      <Video
+                        source={{ uri: mediaUri }}
+                        style={{ width: '100%', height: '100%' }}
+                        controls
+                        paused
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.mediaPlaceholderDark}>
+                        <ActivityIndicator size={32} color="#fff" />
+                        <Text
+                          variant="labelSmall"
+                          style={{ marginTop: 8, color: '#fff' }}
+                        >
+                          Downloading…
+                        </Text>
+                      </View>
+                    )}
+                    {isDownloading ? (
+                      <View style={styles.mediaOverlay}>
+                        <ActivityIndicator size={32} />
+                      </View>
+                    ) : null}
+                    {isFailed ? (
+                      <View style={styles.mediaOverlay}>
+                        <TouchableOpacity
+                          onPress={() => onRetry?.(message.id)}
+                          style={styles.retryWrap}
+                        >
+                          <IconButton icon="refresh" size={18} />
+                          <Text variant="labelSmall" style={{ marginLeft: 6 }}>
+                            Retry
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
                   </View>
                 );
               })()}
@@ -198,14 +210,19 @@ export default function ChatBubble({
           ) : null}
 
           {/* Document / File card */}
-          {message.url &&
-          (isDocLike(message.mime) ||
-            message.type === 'file' ||
-            message.fileName) ? (
+          {(mediaUri &&
+            (isDocLike(message.mime) ||
+              message.type === 'file' ||
+              message.name)) ||
+          (!mediaUri &&
+            (isDocLike(message.mime) ||
+              message.type === 'file' ||
+              message.name) &&
+            isDownloading) ? (
             <View style={{ marginBottom: message.text ? 8 : 0 }}>
               <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => openAttachment(message.url)}
+                activeOpacity={0.85}
+                onPress={() => mediaUri && openAttachment(mediaUri)}
                 style={{ borderRadius: 10, overflow: 'hidden' }}
               >
                 <View
@@ -222,13 +239,10 @@ export default function ChatBubble({
                   ]}
                 >
                   <View style={styles.fileIconWrap}>
-                    <Icon
-                      source={fileIconFor(message.fileType)}
-                      size={20}
-                      color={isMe ? '#fff' : '#3b82f6'}
-                    />
+                    <Text>{fileIconForMime(message.mime)}</Text>
                   </View>
-                  <View>
+
+                  <View style={{ flex: 1 }}>
                     <Text
                       variant="bodyMedium"
                       numberOfLines={1}
@@ -236,7 +250,6 @@ export default function ChatBubble({
                       style={{
                         fontWeight: '600',
                         color: isMe ? '#fff' : '#111827',
-                        width: 80,
                       }}
                     >
                       {message.name ?? 'Attachment'}
@@ -245,68 +258,102 @@ export default function ChatBubble({
                       variant="labelSmall"
                       numberOfLines={1}
                       style={{
-                        color: isMe ? 'rgba(3, 2, 2, 0.8)' : '#6b7280',
+                        color: isMe ? 'rgba(255,255,255,0.8)' : '#6b7280',
                       }}
                     >
-                      {message.mime?.split('/')[1]?.toUpperCase() || 'FILE'}
+                      {message.mime?.split('/')[1]?.toUpperCase() ||
+                        (message.size
+                          ? `${(message.size / 1024).toFixed(1)} KB`
+                          : 'FILE')}
                     </Text>
                   </View>
 
-                  {/* Open button chip */}
                   <View
                     style={{
-                      borderRadius: 999,
-                      paddingVertical: 6,
-                      paddingHorizontal: 10,
-                      backgroundColor: isMe
-                        ? 'rgba(255,255,255,0.16)'
-                        : 'rgba(59,130,246,0.12)',
+                      marginLeft: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
-                    <Text
-                      variant="labelMedium"
-                      style={{
-                        color: isMe ? '#fff' : '#1d4ed8',
-                        fontWeight: '600',
-                      }}
-                    >
-                      Open
-                    </Text>
+                    {isDownloading ? (
+                      <ActivityIndicator size={20} />
+                    ) : isFailed ? (
+                      <TouchableOpacity
+                        onPress={() => onRetry?.(message.id)}
+                        style={[
+                          {
+                            borderRadius: 999,
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                            backgroundColor: isMe
+                              ? 'rgba(255,255,255,0.16)'
+                              : 'rgba(59,130,246,0.12)',
+                          },
+                        ]}
+                      >
+                        <Text
+                          variant="labelMedium"
+                          style={{
+                            color: isMe ? '#fff' : '#1d4ed8',
+                            fontWeight: '600',
+                          }}
+                        >
+                          Retry
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View
+                        style={[
+                          {
+                            borderRadius: 999,
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                            backgroundColor: isMe
+                              ? 'rgba(255,255,255,0.16)'
+                              : 'rgba(59,130,246,0.12)',
+                          },
+                        ]}
+                      >
+                        <Text
+                          variant="labelMedium"
+                          style={{
+                            color: isMe ? '#fff' : '#1d4ed8',
+                            fontWeight: '600',
+                          }}
+                        >
+                          {mediaUri ? 'Open' : 'Pending'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
             </View>
           ) : null}
 
-          {message.mime?.includes('audio/') && (
-            <AudioFilePlayer
-              filePath={message.url || ""}
-              onDeleted={p => console.log('deleted', p)}
-            />
-          )}
+          {/* Audio */}
+          {message.mime?.includes('audio/') || message.type === 'audio' ? (
+            <AudioFilePlayer filePath={mediaUri || ''} onDeleted={() => {}} />
+          ) : null}
 
-          {/* Message text */}
+          {/* Text */}
           {message.text ? (
             <Text variant="bodyMedium" style={{ color: textColor }}>
               {message.text}
             </Text>
           ) : null}
 
-          {/* Meta row (timestamp + ticks) */}
+          {/* Meta row */}
           <View style={[styles.metaRow, { justifyContent: 'flex-end' }]}>
             <Text
               variant="labelSmall"
               style={{ color: isMe ? 'rgba(255,255,255,0.8)' : '#6b7280' }}
             >
-              {formatChatDate(message.createdAt)}
+              {new Date(message.createdAt).toLocaleTimeString()}
             </Text>
             {isMe ? (
-              <View style={{ marginLeft: 4 }}>
-                <Icon
-                  source="check-all"
-                  size={14}
-                  color="rgba(255,255,255,0.8)"
-                />
+              <View style={{ marginLeft: 6 }}>
+                <Text>✓✓</Text>
               </View>
             ) : null}
           </View>
@@ -318,25 +365,15 @@ export default function ChatBubble({
   );
 }
 
-function fileIconFor(type?: Message['fileType']) {
-  switch (type) {
-    case 'image':
-      return 'file-image';
-    case 'pdf':
-      return 'file-pdf-box';
-    case 'doc':
-      return 'file-word';
-    case 'excel':
-      return 'file-excel';
-    case 'zip':
-      return 'folder-zip';
-    case 'txt':
-      return 'file-document';
-    case 'audio':
-      return 'microphone';
-    default:
-      return 'file';
-  }
+function fileIconForMime(mime?: string) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.startsWith('audio/')) return '🎵';
+  if (mime.includes('pdf')) return '📕';
+  if (mime.includes('word')) return '📄';
+  if (mime.includes('zip') || mime.includes('compressed')) return '🗜️';
+  return '📄';
 }
 
 const styles = StyleSheet.create({
@@ -347,7 +384,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     gap: 8,
   },
-  avatar: { width: 24, height: 24, borderRadius: 12 },
+  avatar: { width: 28, height: 28, borderRadius: 14 },
   bubble: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -357,6 +394,45 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(98,0,238,0.12)',
+    backgroundColor: 'rgba(98,0,238,0.08)',
+  },
+  mediaOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+  },
+  mediaBox: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaPlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  mediaPlaceholderDark: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
   },
 });
