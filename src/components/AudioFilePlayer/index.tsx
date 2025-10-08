@@ -42,7 +42,45 @@ export default function AudioFilePlayer({ filePath, onDeleted, autoPlay }: Props
     togglePlayPause,
     seekTo,
     stop,
+    loadError,
   } = useAudioPlayer({ audioUrl: sourceUrl });
+
+  const [exists, setExists] = useState<boolean | null>(null);
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
+
+  // show hook-level load errors too
+  React.useEffect(() => {
+    if (loadError && typeof loadError === 'string') setDiagnostic(loadError);
+  }, [loadError]);
+
+  // check file existence for local paths
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!sourceUrl) {
+          if (mounted) setExists(null);
+          return;
+        }
+        // strip file:// for RNFS.exists on Android/iOS which accepts both
+        const path = sourceUrl.startsWith('file://') ? sourceUrl.replace('file://', '') : sourceUrl;
+        console.log('AudioFilePlayer: checking source', { sourceUrl, path });
+        const ok = await RNFS.exists(path);
+        console.log('AudioFilePlayer: exists?', ok, path);
+        if (mounted) setExists(ok);
+        if (!ok) setDiagnostic('File not found on device');
+        else setDiagnostic(null);
+      } catch (e: any) {
+        if (mounted) setExists(false);
+        setDiagnostic(e?.message ?? String(e));
+      }
+    })();
+    return () => { mounted = false; };
+  }, [sourceUrl]);
+
+  React.useEffect(() => {
+    console.log('AudioFilePlayer: diagnostic', { sourceUrl, exists, diagnostic, duration });
+  }, [sourceUrl, exists, diagnostic, duration]);
 
   const [drag, setDrag] = useState<number | null>(null);
   const value = drag ?? progress;
@@ -71,6 +109,9 @@ export default function AudioFilePlayer({ filePath, onDeleted, autoPlay }: Props
         </TouchableOpacity>
 
         <View style={styles.sliderWrap}>
+            {diagnostic ? (
+              <Text variant="labelSmall" style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 6 }}>{diagnostic}</Text>
+            ) : null}
           <Slider
             style={styles.slider}
             minimumValue={0}

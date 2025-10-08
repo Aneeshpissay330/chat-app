@@ -12,6 +12,7 @@ import {
   sendAudio,
   sendFile,
 } from '../../services/chat';
+import { Platform } from 'react-native';
 import { downloadFileToCache } from '../../utils/download'; // <- new import
 import { Message } from '../../types/chat';
 
@@ -89,6 +90,17 @@ export const startSubscriptions = createAsyncThunk<
       }
 
       // Map firestore docs -> internal Message shape
+      // Helper: normalize local filesystem paths into explicit URI form
+      const normalizeLocalUri = (p?: string) => {
+        if (!p) return p;
+        // leave explicit schemes as-is
+        if (p.startsWith('file://') || p.startsWith('content://') || p.startsWith('data:')) return p;
+        // absolute paths on Android should be prefixed with file:// for RN components
+        if (p.startsWith('/') && Platform.OS === 'android') return `file://${p}`;
+        // otherwise return as-is
+        return p;
+      };
+
       const mapped = docs.map(d => {
         const rawUrl = typeof d.url === 'string' ? d.url : undefined;
 
@@ -98,8 +110,9 @@ export const startSubscriptions = createAsyncThunk<
         // only treat as local if reduxLocal exists OR url matches content://, data:, or absolute path
   const alreadyLocal = !!reduxLocal || isLocalPath(rawUrl, d.senderId);
         // if alreadyLocal is true we will prefer reduxLocal (if present) else rawUrl
-        const chosenLocalPath =
+        const chosenLocalPathRaw =
           reduxLocal ?? (alreadyLocal ? rawUrl : undefined);
+        const chosenLocalPath = normalizeLocalUri(chosenLocalPathRaw);
 
         // Only mark for download if:
         // - we do not have a local path (redux or local url)
@@ -144,9 +157,12 @@ export const startSubscriptions = createAsyncThunk<
 
       // Fire-and-forget sequential downloader for messages that have remote URLs
       (async () => {
-        // Only process messages that are pending AND actually remote (use remoteUrl field)
+        // Only process messages that are pending, remote, and are audio.
+        // We proactively download audio assets in the Redux layer so playback
+        // on receivers uses a local file:// path. Other media types are left
+        // to the UI/preview logic (images/videos may show remote preview).
         const toDownload = mapped.filter(
-          m => m.downloadStatus === 'pending' && m.remoteUrl,
+          m => m.downloadStatus === 'pending' && m.remoteUrl && m.type === 'audio',
         );
 
         for (const msg of toDownload) {

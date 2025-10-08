@@ -23,6 +23,7 @@ export function useAudioPlayer({ audioUrl }: { audioUrl: string }) {
   const [isLoading, startTransition] = useTransition();
   const [duration, setDuration] = useState(0); // ms
   const [progress, setProgress] = useState(0); // ms
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const bufferRef = useRef<AudioBuffer | null>(null);
@@ -61,13 +62,24 @@ export function useAudioPlayer({ audioUrl }: { audioUrl: string }) {
     if (isLocal) {
       arrayBuffer = await loadFromLocal(audioUrl);
     } else {
+      // For remote URLs we attempt a direct fetch + arrayBuffer. Audio
+      // assets (for reliable playback) should be downloaded by the
+      // messages downloader into a local file:// path. If fetch fails,
+      // surface the error and let the messages pipeline retry.
       const res = await fetch(audioUrl);
       const ab = await res.arrayBuffer();
       arrayBuffer = ab;
     }
 
-    const audioBuf = await ctx.decodeAudioData(arrayBuffer);
+    let audioBuf;
+    try {
+      audioBuf = await ctx.decodeAudioData(arrayBuffer);
+    } catch (e: any) {
+      setLoadError(e?.message ?? String(e));
+      throw e;
+    }
     bufferRef.current = audioBuf;
+    setLoadError(null);
     setDuration(Math.floor(audioBuf.duration * 1000));
     setProgress(0);
     pauseMsRef.current = 0;
@@ -205,5 +217,6 @@ export function useAudioPlayer({ audioUrl }: { audioUrl: string }) {
     togglePlayPause,
     seekTo,
     stop,
+    loadError,
   };
 }
