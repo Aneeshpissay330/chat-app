@@ -62,24 +62,19 @@ const CameraScreen: React.FC = () => {
       if (!chatId) return;
       console.log('Photo captured:', photo);
       
-      try {
-        // Use Redux action for sending image with proper file:// prefix
-        await dispatch(sendImageNow({
-          chatId,
-          localPath: `file://${photo.path}`, // Add file:// prefix
-          mime: 'image/jpeg', // Use standard JPEG mime type
-          width: photo.width,
-          height: photo.height,
-          size: 0, // You might want to get actual file size
-        }));
-        
-        console.log('Image sent successfully');
-        // Go back after successful send
-        navigation.goBack();
-      } catch (error) {
-        console.error('Failed to send image:', error);
-        navigation.goBack(); // Still go back even if failed
-      }
+      // Fire and forget - don't await, send immediately and go back
+      dispatch(sendImageNow({
+        chatId,
+        localPath: `file://${photo.path}`, // Add file:// prefix
+        mime: 'image/jpeg', // Use standard JPEG mime type
+        width: photo.width,
+        height: photo.height,
+        size: 0, // You might want to get actual file size
+      }));
+      
+      console.log('Image send dispatched');
+      // Go back immediately without waiting
+      navigation.goBack();
     },
     [chatId, dispatch, navigation],
   );
@@ -89,26 +84,21 @@ const CameraScreen: React.FC = () => {
       if (!chatId) return;
       console.log('Video captured:', video);
       
-      try {
-        // Use Redux action for sending video with proper file:// prefix
-        await dispatch(sendVideoNow({
-          chatId,
-          localPath: `file://${video.path}`, // Consistent file:// prefix
-          mime: 'video/mp4', // Use standard MP4 mime type
-          width: video.width,
-          height: video.height,
-          size: 0, // You might want to get actual file size
-          durationMs:
-            typeof video.duration === 'number' ? video.duration : undefined,
-        }));
-        
-        console.log('Video sent successfully');
-        // Go back after successful send
-        navigation.goBack();
-      } catch (error) {
-        console.error('Failed to send video:', error);
-        navigation.goBack(); // Still go back even if failed
-      }
+      // Fire and forget - don't await, send immediately and go back
+      dispatch(sendVideoNow({
+        chatId,
+        localPath: `file://${video.path}`, // Consistent file:// prefix
+        mime: 'video/mp4', // Use standard MP4 mime type
+        width: video.width,
+        height: video.height,
+        size: 0, // You might want to get actual file size
+        durationMs:
+          typeof video.duration === 'number' ? video.duration : undefined,
+      }));
+      
+      console.log('Video send dispatched');
+      // Go back immediately without waiting
+      navigation.goBack();
     },
     [chatId, dispatch, navigation],
   );
