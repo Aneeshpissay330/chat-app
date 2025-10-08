@@ -197,10 +197,55 @@ export default function ChatView() {
       const id = chatIdRef.current;
       if (!id) return;
 
+      // Normalize and ensure we have access to the file on Android.
+      // Some providers return content:// URIs which later native readers (Firebase
+      // Storage, RNFS) cannot read unless the app copies the file to a private
+      // path obtained via ACTION_OPEN_DOCUMENT or uses a content resolver. To be
+      // robust, copy content:// URIs into the app cache and pass that path on.
+      let localPath: string = doc.uri;
+
+      // Strip file:// prefix if present to make path compatible with RNFS usages
+      if (localPath.startsWith('file://')) {
+        localPath = localPath.replace(/^file:\/\//, '');
+      }
+
+      if (Platform.OS === 'android' && doc.uri.startsWith('content://')) {
+        // Attempt to copy the content URI into the app cache directory so
+        // downstream native code can read it without permission errors.
+        const filename = doc.name?.replace(/\s+/g, '_') || `document-${Date.now()}`;
+        const dest = `${RNFS.CachesDirectoryPath}/${filename}`;
+        try {
+          // copyFile supports content:// URIs on some RNFS builds by using
+          // Android's ContentResolver internally. Try this first.
+          // dest is plain path (no file://) which our other code expects.
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          await RNFS.copyFile(doc.uri, dest);
+          localPath = dest;
+        } catch (err) {
+          // Fallback: try reading as base64 and writing out. Some RNFS
+          // versions support readFile for content URIs.
+          try {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const data = await RNFS.readFile(doc.uri, 'base64');
+            await RNFS.writeFile(dest, data, 'base64');
+            localPath = dest;
+          } catch (err2) {
+            console.warn('Failed to copy picked document to cache', err, err2);
+            Alert.alert(
+              'File access error',
+              'Unable to access the selected file. Try picking the file again or choose a different file.',
+            );
+            return;
+          }
+        }
+      }
+
       await dispatch(
         sendFileNow({
           chatId: id,
-          localPath: doc.uri,
+          localPath: `file:/${localPath}`,
           mime: doc.type || 'application/octet-stream',
           size: doc.size || 0,
           name: doc.name || 'document',
