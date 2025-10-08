@@ -173,7 +173,7 @@ export default function ChatBubble({
           ) : null}
 
           {/* Video */}
-          {message.type === 'video' && (mediaUri || isDownloading) ? (
+          {message.type === 'video' ? (
             <View style={{ marginBottom: 8 }}>
               {(() => {
                 const { width, height } = fitDims(
@@ -204,7 +204,7 @@ export default function ChatBubble({
                           variant="labelSmall"
                           style={{ marginTop: 8, color: '#fff' }}
                         >
-                          Downloading…
+                          {isDownloading ? 'Downloading…' : 'Loading…'}
                         </Text>
                       </View>
                     )}
