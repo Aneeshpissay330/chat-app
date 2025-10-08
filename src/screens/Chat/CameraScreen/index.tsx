@@ -27,9 +27,10 @@ import { useCameraPermissions } from '../../../hooks/useCameraPermissions';
 import { useRecordingControls } from '../../../hooks/useRecordingControls';
 import { useRecordingTimer } from '../../../hooks/useRecordingTimer';
 import { useTorch } from '../../../hooks/useTorch';
-import { findDMChat, sendImage, sendVideo } from '../../../services/chat';
 import { Mode } from '../../../types/camera';
 import ImagePicker from 'react-native-image-crop-picker';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { openDmChat, selectChatIdByOther, sendImageNow, sendVideoNow } from '../../../features/messages';
 
 export type RootTabParamList = {
   Gallery: undefined;
@@ -47,57 +48,77 @@ const CameraScreen: React.FC = () => {
   const isActive = useCameraLifecycle();
   const { hasCam } = useCameraPermissions(mode);
   const { flashOn, torch, toggleFlash } = useTorch(false);
-  const [chatId, setChatId] = useState<string>('');
   const route = useRoute<RouteProp<ChatRouteParams, 'CameraScreen'>>();
 
   const otherUid = route.params?.id; // receiver uid from route
+  
+  // Redux
+  const dispatch = useAppDispatch();
+  const chatId = useAppSelector(s => selectChatIdByOther(s, otherUid));
 
   const cameraRef = useRef<VisionCamera>(null);
   const onPhoto = useCallback(
-    (photo: PhotoFile) => {
-      // Fire and forget — no await
-      sendImage(chatId, {
-        localPath: photo.path,
-        mime: 'image/jpg',
-        width: photo.width,
-        height: photo.height,
-        size: 0,
-      });
-
-      // Go back immediately
-      navigation.goBack();
+    async (photo: PhotoFile) => {
+      if (!chatId) return;
+      console.log('Photo captured:', photo);
+      
+      try {
+        // Use Redux action for sending image with proper file:// prefix
+        await dispatch(sendImageNow({
+          chatId,
+          localPath: `file://${photo.path}`, // Add file:// prefix
+          mime: 'image/jpeg', // Use standard JPEG mime type
+          width: photo.width,
+          height: photo.height,
+          size: 0, // You might want to get actual file size
+        }));
+        
+        console.log('Image sent successfully');
+        // Go back after successful send
+        navigation.goBack();
+      } catch (error) {
+        console.error('Failed to send image:', error);
+        navigation.goBack(); // Still go back even if failed
+      }
     },
-    [chatId],
+    [chatId, dispatch, navigation],
   );
 
   const onVideo = useCallback(
-    (video: VideoFile) => {
-      // Fire and forget — do not await
-      sendVideo(chatId, {
-        localPath: `file:/${video.path}`,
-        mime: 'video/mov',
-        width: video.width,
-        height: video.height,
-        size: 0,
-        durationMs:
-          typeof video.duration === 'number' ? video.duration : undefined,
-      });
-
-      // Go back immediately
-      navigation.goBack();
+    async (video: VideoFile) => {
+      if (!chatId) return;
+      console.log('Video captured:', video);
+      
+      try {
+        // Use Redux action for sending video with proper file:// prefix
+        await dispatch(sendVideoNow({
+          chatId,
+          localPath: `file://${video.path}`, // Consistent file:// prefix
+          mime: 'video/mp4', // Use standard MP4 mime type
+          width: video.width,
+          height: video.height,
+          size: 0, // You might want to get actual file size
+          durationMs:
+            typeof video.duration === 'number' ? video.duration : undefined,
+        }));
+        
+        console.log('Video sent successfully');
+        // Go back after successful send
+        navigation.goBack();
+      } catch (error) {
+        console.error('Failed to send video:', error);
+        navigation.goBack(); // Still go back even if failed
+      }
     },
-    [chatId],
+    [chatId, dispatch, navigation],
   );
 
-  const getChatId = async () => {
-    if (!otherUid) throw new Error('Missing receiver id');
-    const id = await findDMChat(otherUid);
-    setChatId(id || '');
-  };
-
+  // Ensure chat is open when component mounts
   useEffect(() => {
-    getChatId();
-  }, []);
+    if (otherUid && !chatId) {
+      dispatch(openDmChat({ otherUid }));
+    }
+  }, [otherUid, chatId, dispatch]);
 
   const { isRecording, onShoot } = useRecordingControls(
     cameraRef,
@@ -114,8 +135,6 @@ const CameraScreen: React.FC = () => {
   }, [nav]);
 
   const onPressGallery = useCallback(async () => {
-    // TODO: open gallery picker or navigate to gallery
-    // navigation.navigate('Gallery');
     try {
       // Allow both photo & video; cropping only makes sense for images
       const media: any = await ImagePicker.openPicker({
@@ -127,19 +146,22 @@ const CameraScreen: React.FC = () => {
 
       // image
       if (media?.mime?.startsWith('image/')) {
-        await sendImage(chatId, {
+        await dispatch(sendImageNow({
+          chatId,
           localPath: media.path,
           mime: media.mime,
           width: media.width,
           height: media.height,
           size: media.size,
-        });
+        }));
+        navigation.goBack();
         return;
       }
 
       // video
       if (media?.mime?.startsWith('video/')) {
-        await sendVideo(chatId, {
+        await dispatch(sendVideoNow({
+          chatId,
           localPath: media.path,
           mime: media.mime,
           width: media.width,
@@ -147,14 +169,15 @@ const CameraScreen: React.FC = () => {
           size: media.size,
           durationMs:
             typeof media.duration === 'number' ? media.duration : undefined,
-        });
+        }));
+        navigation.goBack();
         return;
       }
       navigation.goBack();
     } catch (error) {
       console.log('Gallery error or cancelled', error);
     }
-  }, []);
+  }, [chatId, dispatch, navigation]);
 
   const onPressSwitchCamera = useCallback(() => {
     if (isRecording) return;

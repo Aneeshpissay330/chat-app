@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Text, IconButton } from 'react-native-paper';
 import Video from 'react-native-video';
+import Pdf from 'react-native-pdf';
 import AudioFilePlayer from '../AudioFilePlayer';
 import type { Message } from '../../types/chat'; // <- use your Message type (adjust path if needed)
 import { useUserDoc } from '../../hooks/useUserDoc';
@@ -259,65 +260,119 @@ export default function ChatBubble({
                   { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : '#f8f9fa' }
                 ]}>
                   <View style={styles.documentPreview}>
-                    {/* Document preview mockup */}
-                    <View style={{
-                      width: '85%',
-                      height: '75%',
-                      backgroundColor: isMe ? 'rgba(255,255,255,0.95)' : '#fff',
-                      borderRadius: 6,
-                      padding: 8,
-                      justifyContent: 'space-between',
-                    }}>
-                      {/* Header section */}
-                      <View>
-                        <View style={{
-                          height: 12,
-                          backgroundColor: '#2c3e50',
-                          borderRadius: 2,
-                          marginBottom: 4,
-                          width: '60%',
-                        }} />
-                        <View style={{
-                          height: 2,
-                          backgroundColor: '#7f8c8d',
-                          borderRadius: 1,
-                          marginBottom: 2,
-                        }} />
-                        <View style={{
-                          height: 2,
-                          backgroundColor: '#7f8c8d',
-                          borderRadius: 1,
-                          marginBottom: 2,
-                          width: '80%',
-                        }} />
-                        <View style={{
-                          height: 2,
-                          backgroundColor: '#7f8c8d',
-                          borderRadius: 1,
-                          width: '70%',
-                        }} />
-                      </View>
-                      
-                      {/* Body content lines */}
-                      <View style={{ flex: 1, justifyContent: 'center', gap: 2 }}>
-                        {[...Array(4)].map((_, i) => (
-                          <View key={i} style={{
-                            height: 1.5,
-                            backgroundColor: '#bdc3c7',
-                            borderRadius: 1,
-                            width: i === 3 ? '50%' : '100%',
-                          }} />
-                        ))}
-                      </View>
-                      
-                      {/* Footer */}
+                    {/* PDF Preview */}
+                    {mediaUri && (message.mime?.includes('pdf') || message.name?.toLowerCase().endsWith('.pdf')) ? (
+                      <Pdf
+                        source={{ uri: mediaUri, cache: true }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: 'transparent',
+                        }}
+                        page={1}
+                        scale={1}
+                        minScale={0.5}
+                        maxScale={3}
+                        horizontal={false}
+                        enablePaging={false}
+                        enableRTL={false}
+                        enableAnnotationRendering={false}
+                        enableAntialiasing={true}
+                        fitPolicy={0} // 0 = fit width, 1 = fit height, 2 = fit both
+                        spacing={0}
+                        onLoadComplete={(numberOfPages) => {
+                          console.log(`PDF loaded with ${numberOfPages} pages`);
+                        }}
+                        onPageChanged={(page) => {
+                          console.log(`Current page: ${page}`);
+                        }}
+                        onError={(error) => {
+                          console.log('PDF loading error:', error);
+                        }}
+                        renderActivityIndicator={() => (
+                          <View style={styles.pdfLoader}>
+                            <ActivityIndicator size={20} color="#6b7280" />
+                          </View>
+                        )}
+                      />
+                    ) : mediaUri && (message.mime?.startsWith('text/') || message.name?.toLowerCase().match(/\.(txt|doc|docx)$/)) ? (
+                      // Text/Word document icon preview
                       <View style={{
-                        height: 4,
-                        backgroundColor: '#95a5a6',
-                        borderRadius: 1,
-                        width: '30%',
-                      }} />
-                    </View>
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: isMe ? 'rgba(255,255,255,0.95)' : '#fff',
+                        borderRadius: 6,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ fontSize: 28, color: '#6b7280' }}>
+                          {getDocumentIcon(message.mime)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>
+                          {getFileType(message.mime)}
+                        </Text>
+                      </View>
+                    ) : (
+                      // Default document mockup for other file types
+                      <View style={{
+                        width: '85%',
+                        height: '75%',
+                        backgroundColor: isMe ? 'rgba(255,255,255,0.95)' : '#fff',
+                        borderRadius: 6,
+                        padding: 8,
+                        justifyContent: 'space-between',
+                      }}>
+                        {/* Header section */}
+                        <View>
+                          <View style={{
+                            height: 12,
+                            backgroundColor: '#2c3e50',
+                            borderRadius: 2,
+                            marginBottom: 4,
+                            width: '60%',
+                          }} />
+                          <View style={{
+                            height: 2,
+                            backgroundColor: '#7f8c8d',
+                            borderRadius: 1,
+                            marginBottom: 2,
+                          }} />
+                          <View style={{
+                            height: 2,
+                            backgroundColor: '#7f8c8d',
+                            borderRadius: 1,
+                            marginBottom: 2,
+                            width: '80%',
+                          }} />
+                          <View style={{
+                            height: 2,
+                            backgroundColor: '#7f8c8d',
+                            borderRadius: 1,
+                            width: '70%',
+                          }} />
+                        </View>
+                        
+                        {/* Body content lines */}
+                        <View style={{ flex: 1, justifyContent: 'center', gap: 2 }}>
+                          {[...Array(4)].map((_, i) => (
+                            <View key={i} style={{
+                              height: 1.5,
+                              backgroundColor: '#bdc3c7',
+                              borderRadius: 1,
+                              width: i === 3 ? '50%' : '100%',
+                            }} />
+                          ))}
+                        </View>
+                        
+                        {/* Footer */}
+                        <View style={{
+                          height: 4,
+                          backgroundColor: '#95a5a6',
+                          borderRadius: 1,
+                          width: '30%',
+                        }} />
+                      </View>
+                    )}
                   </View>
                 </View>
                 
@@ -554,5 +609,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#16a34a',
+  },
+  pdfLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(248,249,250,0.8)',
   },
 });
