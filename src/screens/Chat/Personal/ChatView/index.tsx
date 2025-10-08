@@ -272,17 +272,35 @@ export default function ChatView() {
   }, [start]);
 
   const onCancelRecording = useCallback(async () => {
-    if (isRecording) await stop();
-    if (filePath) await RNFS.unlink(filePath);
+    // stop() now returns the saved file path (or null). Use that to avoid
+    // reading stale hook state which may not update synchronously.
+    let savedPath: string | null = null;
+    if (isRecording) {
+      try {
+        // stop may return the path of the saved WAV
+        // @ts-ignore
+        savedPath = await stop();
+      } catch {}
+    }
+    const pathToDelete = savedPath ?? filePath;
+    if (pathToDelete) await RNFS.unlink(pathToDelete).catch(() => {});
   }, [isRecording, stop, filePath]);
 
   const onSendRecording = useCallback(async () => {
-    if (isRecording) await stop();
-    if (filePath) {
+    // stop() returns the saved file path (or null). Use it to ensure we send
+    // the actual file written on disk rather than relying on hook state.
+    let savedPath: string | null = null;
+    if (isRecording) {
+      // @ts-ignore
+      savedPath = await stop();
+    }
+    const pathToSend = savedPath ?? filePath;
+    if (pathToSend) {
       const id = chatIdRef.current;
       if (!id) return;
-      const stats = await RNFS.stat(filePath);
-      await sendAudio(id, { localPath: `file:/${filePath}`, size: stats.size });
+  const stats = await RNFS.stat(pathToSend);
+  // Pass plain file system path. UI components will convert to file:// when needed.
+  await sendAudio(id, { localPath: pathToSend, size: stats.size });
     }
   }, [isRecording, stop, filePath]);
 

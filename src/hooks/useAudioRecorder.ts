@@ -143,16 +143,17 @@ export function useAudioRecorder({
     setIsPaused(false);
     captureEnabledRef.current = false;
 
-    const chunks = audioChunksRef.current;
-    if (!chunks.length) return;
+  const chunks = audioChunksRef.current;
+  if (!chunks.length) return null;
 
     try {
       const pcm = concatInt16(chunks);
       const wavBytes = encodeWavFromInt16(pcm, sampleRate);
       const path = `${RNFS.DocumentDirectoryPath}/recording_${Date.now()}.wav`;
       const base64 = Buffer.from(wavBytes).toString('base64');
-      await RNFS.writeFile(path, base64, 'base64');
-      setFilePath(path);
+  await RNFS.writeFile(path, base64, 'base64');
+  setFilePath(path);
+  return path;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn('Failed to finalize recording', err);
