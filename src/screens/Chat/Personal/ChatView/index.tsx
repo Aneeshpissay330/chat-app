@@ -3,6 +3,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import {
   RouteProp,
   useFocusEffect,
+  useIsFocused,
   useNavigation,
   useRoute,
 } from '@react-navigation/native';
@@ -136,6 +137,20 @@ export default function ChatView() {
   useEffect(() => {
     console.log('messages changed', messages);
   }, [messages]);
+
+  // If new messages arrive while this screen is focused, ensure they're
+  // immediately marked as read so the Personal list shows correct counts
+  // when navigating back. This complements the focus-based markReadNow
+  // (which runs when the screen gains focus) by reacting to incoming
+  // message changes while focused.
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    const id = chatId;
+    if (!id) return;
+    if (!isFocused) return;
+    if (isSelf) return;
+    dispatch(markReadNow({ chatId: id }));
+  }, [dispatch, chatId, isFocused, messages.length, isSelf]);
   /**
    * Mark read and reset typing on focus/blur of the screen instead of reacting to message changes.
    */
