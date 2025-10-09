@@ -119,21 +119,19 @@ export const startSubscriptions = createAsyncThunk<
   // - AND the stored url looks like a remote HTTP(S) URL
   const needsDownload = !chosenLocalPath && isRemoteUrl(rawUrl);
 
-  // Expose remote HTTP(S) URLs for immediate preview for images, videos,
-  // and document/file types so receivers can see the attachment immediately
-  // (PDFs, docs, text files, etc.). Audio remains background-downloaded.
+  // Expose remote HTTP(S) URLs for immediate preview only for images/videos.
+  // For document/file types we avoid exposing remote URLs in Redux so the
+  // background downloader (below) can fetch and populate `localPath`.
   const isDocLike = (m?: string) =>
     !m ? false : !(m.startsWith('image/') || m.startsWith('video/') || m.startsWith('audio/'));
-  const exposeRemoteForPreview =
-    isRemoteUrl(rawUrl) && (d.type === 'image' || d.type === 'video' || d.type === 'file' || isDocLike(d.mime));
+  const exposeRemoteForPreview = isRemoteUrl(rawUrl) && (d.type === 'image' || d.type === 'video');
   const urlToStore = chosenLocalPath ?? (exposeRemoteForPreview ? rawUrl : undefined);
 
-        // Background downloader: only audio assets are proactively downloaded
-        // by the Redux downloader below. For other types (images/videos/files)
-        // we either show a remote preview (images/videos) or download on demand
-        // (files/docs). Avoid leaving non-audio messages in 'pending' state so
-        // the UI doesn't show an indefinite spinner.
-        const shouldBackgroundDownload = needsDownload && d.type === 'audio';
+        // Background downloader: proactively download audio and document/file
+        // attachments for receivers so the UI can open them via native viewers.
+        // Images/videos are shown via remote preview and are not background-downloaded.
+        const shouldBackgroundDownload =
+          needsDownload && (d.type === 'audio' || d.type === 'file' || isDocLike(d.mime));
         const remoteUrl = shouldBackgroundDownload ? rawUrl : undefined;
 
         return {
@@ -163,16 +161,25 @@ export const startSubscriptions = createAsyncThunk<
 
       // Immediately dispatch so UI can render messages and per-message loaders
       thunkApi.dispatch(setMessages({ otherUid, messages: mapped }));
+      // Debug: print mapping for receivers to help explain missing localPath
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('messages mapped for', otherUid, mapped.map(m => ({ id: m.id, type: m.type, remoteUrl: m.remoteUrl, downloadStatus: m.downloadStatus, localPath: m.localPath })));
+      } catch (e) {}
 
       // Fire-and-forget sequential downloader for messages that have remote URLs
       (async () => {
-        // Only process messages that are pending, remote, and are audio.
-        // We proactively download audio assets in the Redux layer so playback
-        // on receivers uses a local file:// path. Other media types are left
-        // to the UI/preview logic (images/videos may show remote preview).
+        // Process messages that are pending and have a remoteUrl. This will
+        // include audio and document/file types (we excluded images/videos
+        // earlier when deciding remoteUrl). Downloads happen sequentially.
         const toDownload = mapped.filter(
-          m => m.downloadStatus === 'pending' && m.remoteUrl && m.type === 'audio',
+          m => m.downloadStatus === 'pending' && m.remoteUrl,
         );
+        // Debug: list what we'll download
+        try {
+          // eslint-disable-next-line no-console
+          console.debug('toDownload list for', otherUid, toDownload.map(d => ({ id: d.id, remoteUrl: d.remoteUrl, name: d.name })));
+        } catch (e) {}
 
         for (const msg of toDownload) {
           // mark downloading (so chat bubble shows spinner)
@@ -205,6 +212,10 @@ export const startSubscriptions = createAsyncThunk<
                 },
               }),
             );
+            try {
+              // eslint-disable-next-line no-console
+              console.debug('downloaded', msg.id, '->', localUri);
+            } catch (e) {}
           } catch (err: any) {
             console.warn(
               'Message download failed',
@@ -218,6 +229,10 @@ export const startSubscriptions = createAsyncThunk<
                 patch: { downloadStatus: 'failed' as const },
               }),
             );
+            try {
+              // eslint-disable-next-line no-console
+              console.debug('download failed for', msg.id, err?.message ?? err);
+            } catch (e) {}
           }
 
           // small await to yield to the event loop / UI

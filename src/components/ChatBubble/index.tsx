@@ -1,5 +1,5 @@
 // src/components/ChatBubble/index.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,6 +15,7 @@ import Pdf from 'react-native-pdf';
 import AudioFilePlayer from '../AudioFilePlayer';
 import type { Message } from '../../types/chat'; // <- use your Message type (adjust path if needed)
 import { useUserDoc } from '../../hooks/useUserDoc';
+import { downloadFileToCache } from '../../utils/download';
 import { viewDocument } from '@react-native-documents/viewer'
 
 type Props = {
@@ -75,6 +76,7 @@ export default function ChatBubble({
   const borderColor = '#e5e7eb';
   const nameColor = isMe ? 'rgba(255,255,255,0.9)' : '#6b7280';
   const { userDoc } = useUserDoc();
+  const [isOpening, setIsOpening] = useState(false);
 
   const isDownloading =
     message.downloadStatus === 'pending' ||
@@ -87,7 +89,24 @@ export default function ChatBubble({
   async function openAttachment(uri?: string) {
     try {
       if (!uri) return;
-      await viewDocument({ uri: uri, mimeType: message.mime })
+
+      // If this is a remote http(s) URL and the viewer is a receiver (not the sender),
+      // download into cache first so native viewers that expect local files work.
+      const isRemote = /^https?:\/\//i.test(uri);
+      const amReceiver = !!userDoc && message.userId !== userDoc.uid;
+      let finalUri = uri;
+
+      if (isRemote && amReceiver) {
+        setIsOpening(true);
+        try {
+          const filename = message.name || message.id;
+          finalUri = await downloadFileToCache({ url: uri, filename });
+        } finally {
+          setIsOpening(false);
+        }
+      }
+
+      await viewDocument({ uri: finalUri, mimeType: message.mime });
     } catch (e) {
       Alert.alert(
         'Cannot open file',
@@ -245,6 +264,7 @@ export default function ChatBubble({
             <View style={{ marginBottom: message.text ? 8 : 0 }}>
               <TouchableOpacity
                 activeOpacity={0.85}
+                disabled={isOpening}
                 onPress={() => mediaUri && openAttachment(mediaUri)}
                 style={[
                   styles.documentCard,
@@ -390,6 +410,11 @@ export default function ChatBubble({
                   >
                     {message.name ?? 'Attachment'}
                   </Text>
+                  {isOpening && (
+                    <View style={{ position: 'absolute', right: 12, top: 12 }}>
+                      <ActivityIndicator size={14} color={isMe ? '#fff' : '#6b7280'} />
+                    </View>
+                  )}
                   
                   <View style={styles.documentMeta}>
                     <Text style={[
