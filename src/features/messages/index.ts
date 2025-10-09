@@ -114,18 +114,27 @@ export const startSubscriptions = createAsyncThunk<
           reduxLocal ?? (alreadyLocal ? rawUrl : undefined);
         const chosenLocalPath = normalizeLocalUri(chosenLocalPathRaw);
 
-        // Only mark for download if:
-        // - we do not have a local path (redux or local url)
-        // - AND the stored url looks like a remote HTTP(S) URL
-        const needsDownload = !chosenLocalPath && isRemoteUrl(rawUrl);
+  // Only mark for download if:
+  // - we do not have a local path (redux or local url)
+  // - AND the stored url looks like a remote HTTP(S) URL
+  const needsDownload = !chosenLocalPath && isRemoteUrl(rawUrl);
 
-  // Expose remote HTTP(S) URLs for immediate preview only for images/videos
-  // so receivers can see the media while we download and cache it.
-  // For other types we keep the previous behavior (hide remote until cached).
-  const exposeRemoteForPreview = isRemoteUrl(rawUrl) && (d.type === 'image' || d.type === 'video');
+  // Expose remote HTTP(S) URLs for immediate preview for images, videos,
+  // and document/file types so receivers can see the attachment immediately
+  // (PDFs, docs, text files, etc.). Audio remains background-downloaded.
+  const isDocLike = (m?: string) =>
+    !m ? false : !(m.startsWith('image/') || m.startsWith('video/') || m.startsWith('audio/'));
+  const exposeRemoteForPreview =
+    isRemoteUrl(rawUrl) && (d.type === 'image' || d.type === 'video' || d.type === 'file' || isDocLike(d.mime));
   const urlToStore = chosenLocalPath ?? (exposeRemoteForPreview ? rawUrl : undefined);
-  // Keep remoteUrl for the downloader to use (download still happens if needed)
-  const remoteUrl = needsDownload ? rawUrl : undefined;
+
+        // Background downloader: only audio assets are proactively downloaded
+        // by the Redux downloader below. For other types (images/videos/files)
+        // we either show a remote preview (images/videos) or download on demand
+        // (files/docs). Avoid leaving non-audio messages in 'pending' state so
+        // the UI doesn't show an indefinite spinner.
+        const shouldBackgroundDownload = needsDownload && d.type === 'audio';
+        const remoteUrl = shouldBackgroundDownload ? rawUrl : undefined;
 
         return {
           id: d.id,
@@ -141,7 +150,7 @@ export const startSubscriptions = createAsyncThunk<
           // If we already have local path, mark 'idle'; else 'pending' only if remote
           downloadStatus: chosenLocalPath
             ? 'idle'
-            : needsDownload
+            : shouldBackgroundDownload
             ? 'pending'
             : 'idle',
           width: d.width,
