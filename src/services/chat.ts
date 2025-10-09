@@ -183,10 +183,16 @@ export function subscribeMessages(
     .orderBy('createdAt', 'desc')
     .limit(pageSize)
     .onSnapshot(async snap => {
-      const msgs = snap.docs.map(d => ({
+      let msgs = snap.docs.map(d => ({
         id: d.id,
         ...(d.data() as any),
       })) as MessageDoc[];
+
+      // IMPORTANT: do not expose "pending" messages to other users.
+      // Keep pending messages visible to the sender (me), but filter
+      // them out for receivers until the upload completes and the
+      // message status is updated to 'sent'.
+      msgs = msgs.filter(m => !(m.senderId !== me && m.status === 'pending'));
 
       // Auto mark as delivered
       const batch = firestore().batch();
