@@ -134,9 +134,6 @@ export default function ChatView() {
       };
     }, [dispatch, otherUid, isSelf]),
   );
-  useEffect(() => {
-    console.log('messages changed', messages);
-  }, [messages]);
 
   // If new messages arrive while this screen is focused, ensure they're
   // immediately marked as read so the Personal list shows correct counts
