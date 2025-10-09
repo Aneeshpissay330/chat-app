@@ -18,19 +18,15 @@ export function formatChatDate(dateString: string) {
   })();
 
   if (isToday) {
-    // Format as 2:30 PM
-    return date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return 'Today';
   } else if (isYesterday) {
     return 'Yesterday';
   } else {
-    // Format as Sep 30
+    // Format as 09 October 2025
     return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
     });
   }
 }

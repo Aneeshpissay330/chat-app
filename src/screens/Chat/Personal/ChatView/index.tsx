@@ -27,7 +27,7 @@ import {
   View,
 } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
-import { Avatar, IconButton, List, useTheme } from 'react-native-paper';
+import { Avatar, IconButton, List, useTheme, Chip } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ChatBubble from '../../../../components/ChatBubble';
 import ChatInput from '../../../../components/ChatInput';
@@ -58,6 +58,7 @@ import { useUserDoc } from '../../../../hooks/useUserDoc';
 import { sendAudio } from '../../../../services/chat';
 import { colors } from '../../../../theme';
 import { FFT_SIZE } from '../../../../utils/audio';
+import { formatChatDate } from '../../../../utils/date';
 
 type ChatRouteParams = {
   ChatView: { id: string; type?: 'group'; name?: string; avatar?: string };
@@ -80,7 +81,7 @@ export default function ChatView() {
   const otherAvatar = route.params?.avatar;
   const isGroup = route.params?.type === 'group';
 
-  const listRef = useRef<FlatList<Message>>(null);
+  // listRef is declared below with ChatListItem typing
 
   // Me
   const me = auth().currentUser?.uid;
@@ -165,23 +166,84 @@ export default function ChatView() {
     }, [dispatch, chatIdRef.current]),
   );
 
-  const renderItem: ListRenderItem<Message> = useCallback(
+  // We'll build a flattened list mixing date-separator "items" with messages.
+  type DateItem = { kind: 'date'; id: string; dateLabel: string };
+  type ChatListItem = DateItem | Message;
+
+  const listRef = useRef<FlatList<ChatListItem>>(null);
+
+  const listData = useMemo(() => {
+    // We need to account for the FlatList being inverted. To make the
+    // Chip appear visually above a date-group (nearer the newer messages),
+    // insert the date separator AFTER the last message of that date in
+    // the data array. When inverted, that separator will render above the
+    // message group.
+    const out: ChatListItem[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      out.push(m);
+
+      // Determine if next message is a different date (or no next message)
+      const next = messages[i + 1];
+      const d = new Date(m.createdAt);
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      let nextDateKey: string | null = null;
+      if (next) {
+        const nd = new Date(next.createdAt);
+        nextDateKey = `${nd.getFullYear()}-${nd.getMonth() + 1}-${nd.getDate()}`;
+      }
+
+      if (!next || nextDateKey !== dateKey) {
+        // push separator after the last message of this date
+        out.push({ kind: 'date', id: `date-${dateKey}`, dateLabel: formatChatDate(m.createdAt) });
+      }
+    }
+
+    return out;
+  }, [messages]);
+
+  const isDateItem = (i: ChatListItem): i is DateItem => (i as any).kind === 'date';
+
+  const keyExtractor = useCallback((item: ChatListItem) => {
+    return isDateItem(item) ? item.id : item.id;
+  }, []);
+
+  const renderItem: ListRenderItem<ChatListItem> = useCallback(
     ({ item, index }) => {
-      const isMe = !!me && item.userId === me;
-      const prev = messages[index + 1]; // inverted list
+      if (isDateItem(item)) {
+        return (
+          <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+            <Chip mode="outlined">{item.dateLabel}</Chip>
+          </View>
+        );
+      }
+
+      const message = item as Message;
+      const isMe = !!me && message.userId === me;
+
+      // find the next message item in the flattened list (next chronological)
+      let prevMsg: Message | undefined;
+      for (let i = index + 1; i < listData.length; i++) {
+        const it = listData[i];
+        if (!isDateItem(it)) {
+          prevMsg = it as Message;
+          break;
+        }
+      }
+
+      const showAvatar = !isMe && (!prevMsg || prevMsg.userId !== message.userId);
+
       return (
         <ChatBubble
-          message={item}
+          message={message}
           isMe={isMe}
-          showAvatar={false}
+          showAvatar={showAvatar}
           showName={isGroup && !isMe}
         />
       );
     },
-    [messages, me, isGroup],
+    [listData, me, isGroup],
   );
-
-  const keyExtractor = useCallback((m: Message) => m.id, []);
 
   const onSend = useCallback(
     async (text: string) => {
@@ -429,7 +491,7 @@ export default function ChatView() {
         <View style={{ flex: 1 }}>
           <FlatList
             ref={listRef}
-            data={messages}
+            data={listData}
             inverted
             keyExtractor={keyExtractor}
             renderItem={renderItem}
