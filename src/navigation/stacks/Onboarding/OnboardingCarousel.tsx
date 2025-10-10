@@ -13,6 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../../theme';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { setStep, completeOnboarding } from '../../../features/onboarding';
 import cards from './data';
 import { ProgressBar } from 'react-native-paper';
 
@@ -24,7 +26,9 @@ export default function OnboardingCarousel() {
   const theme = useTheme();
   const colors = (theme as any)?.colors ?? {};
   const scrollRef = React.useRef<ScrollView | null>(null);
-  const [current, setCurrent] = React.useState(0);
+  const dispatch = useAppDispatch();
+  const storedStep = useAppSelector((s) => s.onboarding?.step ?? 0);
+  const [current, setCurrent] = React.useState<number>(storedStep ?? 0);
 
   function goTo(i: number) {
     const clamped = Math.max(0, Math.min(cards.length - 1, i));
@@ -34,15 +38,20 @@ export default function OnboardingCarousel() {
 
   function onNext() {
     if (current < cards.length - 1) goTo(current + 1);
-    else nav.navigate('Tabs' as any);
+    else {
+      dispatch(completeOnboarding());
+      // No direct navigation here — top-level Navigation will switch to the main app when onboardingCompleted becomes true
+    }
   }
 
   function onSkip() {
-    nav.navigate('Tabs' as any);
+    dispatch(completeOnboarding());
+    // top-level Navigation listens to onboarding.completed and will render main Stacks
   }
 
   function onClose() {
-    nav.navigate('Tabs' as any);
+    dispatch(completeOnboarding());
+    // top-level Navigation listens to onboarding.completed and will render main Stacks
   }
 
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -50,6 +59,20 @@ export default function OnboardingCarousel() {
     const idx = Math.round(x / width);
     if (idx !== current) setCurrent(idx);
   }
+
+  // initialize from persisted step
+  React.useEffect(() => {
+    if (storedStep && storedStep !== current) {
+      setCurrent(storedStep);
+      setTimeout(() => scrollRef.current?.scrollTo({ x: storedStep * width, animated: false }), 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // write back step to redux when current changes
+  React.useEffect(() => {
+    dispatch(setStep(current));
+  }, [current, dispatch]);
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16), backgroundColor: colors.surface ?? '#fff' }]}>      
