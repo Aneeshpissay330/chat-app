@@ -3,6 +3,8 @@ export type Message = {
   text?: string;
   createdAt: string;
   userId: string;
+  userName?: string;
+  userAvatar?: string;
   type?: 'text' | 'image' | 'video' | 'audio' | 'file';
   url?: string; // original/remote url or local file path after download
   localPath?: string; // local filesystem path if downloaded

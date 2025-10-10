@@ -20,12 +20,12 @@ const Navigation = () => {
   //   return <PhoneLoginScreen />;
   // }
 
-  if (!user?.email) {
-    return <GoogleLoginScreen />;
-  }
+  // if (!user?.email) {
+  //   return <GoogleLoginScreen />;
+  // }
 
-  return <Stacks />;
-  // return <OnboardingStack />
+  // return <Stacks />;
+  return <OnboardingStack />
 };
 
 export default Navigation;

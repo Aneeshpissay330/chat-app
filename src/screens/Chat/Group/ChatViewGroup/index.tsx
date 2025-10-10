@@ -67,9 +67,9 @@ const initialGroupMessages: Message[] = [
     userName: 'Maria Lopez',
     userAvatar:
       'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg',
-    fileName: 'design_spec_v3.pdf',
-    fileSizeLabel: '1.2 MB',
-    fileType: 'pdf',
+    name: 'design_spec_v3.pdf',
+    size: 1.2 * 1024 * 1024, // bytes approx
+    mime: 'application/pdf',
     text: 'Spec doc attached.',
   },
 ];
@@ -123,11 +123,11 @@ export default function ChatViewGroup() {
 
   const keyExtractor = useCallback((m: Message) => m.id, []);
 
-  const onSend = useCallback((payload: SendPayload) => {
-    if (!payload.text?.trim() && !payload.files?.length) return;
+  const onSend = useCallback((text: string) => {
+    if (!text?.trim()) return;
     const next: Message = {
       id: `local-${Date.now()}`,
-      text: payload.text,
+      text: text,
       createdAt: new Date().toISOString(),
       userId: ME,
     };

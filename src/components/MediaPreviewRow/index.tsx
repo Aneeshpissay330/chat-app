@@ -25,7 +25,7 @@ export type RootTabParamList = {
 };
 
 type MediaPreviewRowProps = {
-  otherUid: string;
+  otherUid?: string;
 }
 
 const MediaPreviewRow : React.FC<MediaPreviewRowProps> = ({ otherUid }) => {

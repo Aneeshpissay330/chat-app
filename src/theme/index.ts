@@ -3,6 +3,7 @@ import {
   MD3LightTheme,
   MD3DarkTheme,
   configureFonts,
+  useTheme as usePaperTheme,
 } from 'react-native-paper';
 import { MD3Typescale, ThemeProp } from 'react-native-paper/lib/typescript/types';
 
@@ -52,14 +53,18 @@ const fonts = configureFonts({
   ) as MD3Typescale,
 });
 
-// Common brand colors
+// Updated brand colors aligned with the soft-violet design system
 export const colors = {
-  primary: '#4B6CFF',
-  primaryVariant: '#3A8DFF',
-  secondary: '#9C42FF',
-  secondaryVariant: '#C56FFF',
-  background: '#FFFFFF',
-  darkBackground: '#121212',
+  primary: '#7A6FF0', // soft violet (main accent)
+  primaryVariant: '#6A5EF0',
+  secondary: '#B7A9F6', // lighter violet for secondary accents
+  secondaryVariant: '#D9CCFF',
+  background: '#F8F8FB', // soft off-white background for light theme
+  surface: '#FFFFFF',
+  darkBackground: '#0F1724', // deep charcoal for dark surfaces
+  textPrimary: '#1E1E28',
+  textSecondary: '#8A8A9E',
+  danger: '#FF5F56',
 };
 
 // ✅ Exported Light Theme
@@ -76,13 +81,14 @@ export const lightTheme: ThemeProp = {
     secondary: colors.secondary,
     onSecondary: '#FFFFFF',
     secondaryContainer: colors.secondaryVariant,
-    onSecondaryContainer: '#FFFFFF',
-    onBackground: '#121212',
-    surface: '#FFFFFF',
-    onSurface: '#1E1E1E',
-    surfaceVariant: '#E0E0E0',
-    onSurfaceVariant: '#444444',
-    outline: '#B0B0B0',
+    onSecondaryContainer: '#1E1E28',
+    surface: colors.surface,
+    onSurface: colors.textPrimary,
+    surfaceVariant: '#F1F0F6',
+    onSurfaceVariant: colors.textSecondary,
+    outline: '#D0CFDA',
+    error: colors.danger,
+    onError: '#FFFFFF',
   },
 };
 
@@ -98,14 +104,20 @@ export const darkTheme: ThemeProp = {
     primaryContainer: colors.primaryVariant,
     onPrimaryContainer: '#FFFFFF',
     secondary: colors.secondary,
-    onSecondary: '#FFFFFF',
+    onSecondary: '#000000',
     secondaryContainer: colors.secondaryVariant,
-    onSecondaryContainer: '#FFFFFF',
-    onBackground: '#FFFFFF',
-    surface: '#1A1A1A',
+    onSecondaryContainer: '#000000',
+    surface: '#141416',
     onSurface: '#FFFFFF',
-    surfaceVariant: '#2C2C2C',
-    onSurfaceVariant: '#DDDDDD',
-    outline: '#666666',
+    surfaceVariant: '#1F1C2E',
+    onSurfaceVariant: '#CCCCCC',
+    outline: '#444444',
+    error: colors.danger,
+    onError: '#FFFFFF',
   },
 };
+
+// Re-export a typed useTheme hook so consumers can import from the project's theme module
+export type AppTheme = ThemeProp;
+
+export const useTheme = (): AppTheme => usePaperTheme() as AppTheme;
