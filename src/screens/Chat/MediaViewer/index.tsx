@@ -11,6 +11,7 @@ import {
   ViewToken,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { IconButton, useTheme, Menu } from 'react-native-paper';
@@ -28,6 +29,7 @@ export default function MediaViewer() {
   const route = useRoute<RouteProp<RouteParams, 'MediaViewer'>>();
   const navigation = useNavigation();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const items = route.params?.items ?? [];
   const initial = route.params?.initialIndex ?? 0;
   const title = route.params?.title ?? '';
@@ -43,6 +45,7 @@ export default function MediaViewer() {
     closeMenu();
     try {
       const currentItem = items[index];
+      console.log('Preparing to share item:', currentItem);
       if (!currentItem?.src) {
         Alert.alert('Error', 'No media to share');
         return;
@@ -194,11 +197,13 @@ export default function MediaViewer() {
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
   const renderItem = useCallback(({ item }: { item: MediaItem }) => {
+    const mediaHeight = height - 100 - Math.max(insets.bottom, 20); // Account for header and bottom safe area
+    
     if (item.type === 'image') {
-      return <Image source={{ uri: item.src }} style={styles.media} resizeMode="contain" />;
+      return <Image source={{ uri: item.src }} style={[styles.media, { height: mediaHeight }]} resizeMode="contain" />;
     }
-    return <Video source={{ uri: item.src }} style={styles.media} controls resizeMode="contain" />;
-  }, []);
+    return <Video source={{ uri: item.src }} style={[styles.media, { height: mediaHeight }]} controls resizeMode="contain" />;
+  }, [insets.bottom]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -217,7 +222,7 @@ export default function MediaViewer() {
         style={{ flex: 1 }}
       />
 
-      <View style={styles.paginationOverlay}>
+      <View style={[styles.paginationOverlay, { bottom: Math.max(insets.bottom + 10, 30) }]}>
         <Text style={styles.paginationText}>
           {index + 1} of {items.length}
         </Text>
@@ -232,11 +237,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600' },
   mediaContainer: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   mediaWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  media: { width: width, height: height - 100 }, // Adjusted height to account for header only
+  media: { width: width }, // Removed fixed height, now calculated dynamically
   navHit: { width: 64, height: '100%' },
   paginationOverlay: {
     position: 'absolute',
-    bottom: 30,
     left: 0,
     right: 0,
     alignItems: 'center',
