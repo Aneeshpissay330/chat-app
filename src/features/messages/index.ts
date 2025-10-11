@@ -13,6 +13,7 @@ import {
   sendFile,
 } from '../../services/chat';
 import { Platform } from 'react-native';
+import { formatLastSeen } from '../../utils/date';
 import { downloadFileToCache } from '../../utils/download'; // <- new import
 import { Message } from '../../types/chat';
 
@@ -250,10 +251,7 @@ export const startSubscriptions = createAsyncThunk<
           const txt = isOnline
             ? 'Online'
             : lastActive
-            ? `Last seen ${Math.max(
-                1,
-                Math.round((Date.now() - lastActive.getTime()) / 60000),
-              )}m ago`
+            ? formatLastSeen(lastActive)
             : 'Offline';
           thunkApi.dispatch(setPresence({ otherUid, presenceText: txt }));
         },
