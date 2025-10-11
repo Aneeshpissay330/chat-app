@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Text, IconButton } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import Video from 'react-native-video';
 import Pdf from 'react-native-pdf';
 import AudioFilePlayer from '../AudioFilePlayer';
@@ -24,6 +25,7 @@ type Props = {
   showAvatar?: boolean;
   showName?: boolean;
   onRetry?: (messageId: string) => void; // optional retry handler
+  onOpenMedia?: (items: { src: string; type: 'image' | 'video' }[], index: number) => void;
 };
 
 function fitDims(
@@ -70,6 +72,7 @@ export default function ChatBubble({
   showAvatar = !isMe,
   showName = false,
   onRetry,
+  onOpenMedia,
 }: Props) {
   const bubbleBg = isMe ? '#0b93f6' : '#fff';
   const textColor = isMe ? '#fff' : '#111';
@@ -77,6 +80,7 @@ export default function ChatBubble({
   const nameColor = isMe ? 'rgba(255,255,255,0.9)' : '#6b7280';
   const { userDoc } = useUserDoc();
   const [isOpening, setIsOpening] = useState(false);
+  const navigation = useNavigation<any>();
 
   const isDownloading =
     message.downloadStatus === 'pending' ||
@@ -168,7 +172,22 @@ export default function ChatBubble({
 
                 // always show a box — even if no uri and not downloading yet
                 return (
-                  <View style={[styles.mediaBox, { width, height }]}>
+                  <TouchableOpacity
+                    activeOpacity={0.95}
+                    onPress={() => {
+                      if (!mediaUri) return;
+                      if (typeof onOpenMedia === 'function') {
+                        onOpenMedia([{ src: mediaUri, type: 'image' }], 0);
+                        return;
+                      }
+                      navigation.navigate('MediaViewer', {
+                        items: [{ src: mediaUri, type: 'image' }],
+                        initialIndex: 0,
+                        title: message.name ?? '',
+                      });
+                    }}
+                    style={[styles.mediaBox, { width, height }]}
+                  >
                     {mediaUri ? (
                       <Image
                         source={{ uri: mediaUri }}
@@ -185,7 +204,7 @@ export default function ChatBubble({
                         <ActivityIndicator size={32} />
                       </View>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
                 );
               })()}
             </View>
@@ -202,7 +221,20 @@ export default function ChatBubble({
                   300,
                 );
                 return (
-                  <View
+                  <TouchableOpacity
+                    activeOpacity={0.95}
+                    onPress={() => {
+                      if (!mediaUri) return;
+                      if (typeof onOpenMedia === 'function') {
+                        onOpenMedia([{ src: mediaUri, type: 'video' }], 0);
+                        return;
+                      }
+                      navigation.navigate('MediaViewer', {
+                        items: [{ src: mediaUri, type: 'video' }],
+                        initialIndex: 0,
+                        title: message.name ?? '',
+                      });
+                    }}
                     style={[
                       styles.mediaBox,
                       { width, height, backgroundColor: '#000' },
@@ -245,7 +277,7 @@ export default function ChatBubble({
                         </TouchableOpacity>
                       </View>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
                 );
               })()}
             </View>

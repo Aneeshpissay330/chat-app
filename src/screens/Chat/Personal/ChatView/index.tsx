@@ -107,6 +107,15 @@ export default function ChatView() {
     [otherUid, me],
   );
 
+  const nav = navigation;
+
+  // Build a simple array of image/video items for the media viewer
+  const mediaItems = useMemo(() => {
+    return messages
+      .filter(m => m.type === 'image' || m.type === 'video')
+      .map(m => ({ src: m.localPath || m.url || '', type: m.type as 'image' | 'video', id: m.id }));
+  }, [messages]);
+
   // Latest chatId for async/cleanup
   const chatIdRef = useRef<string | undefined>(chatId ?? undefined);
   useEffect(() => {
@@ -233,16 +242,29 @@ export default function ChatView() {
 
       const showAvatar = !isMe && (!prevMsg || prevMsg.userId !== message.userId);
 
+      const onOpenMedia = (items: { src: string; type: 'image' | 'video' }[], idx: number) => {
+        // If the message exists in the larger mediaItems list, open full list at that index.
+        const globalIndex = mediaItems.findIndex(mi => mi.id === message.id);
+        if (globalIndex >= 0) {
+          const payload = mediaItems.map(mi => ({ src: mi.src, type: mi.type }));
+          (nav as any).navigate('MediaViewer', { items: payload, initialIndex: globalIndex, title: otherName });
+          return;
+        }
+        // fallback: open the small array passed directly
+        (nav as any).navigate('MediaViewer', { items, initialIndex: idx, title: otherName });
+      };
+
       return (
         <ChatBubble
           message={message}
           isMe={isMe}
           showAvatar={showAvatar}
           showName={isGroup && !isMe}
+          onOpenMedia={onOpenMedia}
         />
       );
     },
-    [listData, me, isGroup],
+    [listData, me, isGroup, mediaItems, nav, otherName],
   );
 
   const onSend = useCallback(

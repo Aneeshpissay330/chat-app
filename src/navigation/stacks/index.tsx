@@ -2,6 +2,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import Tabs from '../tabs';
 import ChatView from '../../screens/Chat/Personal/ChatView';
 import Gallery from '../../screens/Chat/Gallery';
+import MediaViewer from '../../screens/Chat/MediaViewer';
 import CameraScreen from '../../screens/Chat/CameraScreen';
 import PersonalChatContact from '../../screens/Chat/Personal/ChatView/PersonalChatContact';
 import MediaTabs from '../../components/MediaTabs';
@@ -50,6 +51,7 @@ function Stacks() {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Gallery" component={Gallery} />
+  <Stack.Screen name="MediaViewer" component={MediaViewer} options={{ headerShown: false }} />
       <Stack.Screen name="MediaTabsScreen" component={MediaTabs} />
       <Stack.Screen name='EditProfile' component={EditProfile} />
       <Stack.Screen name='ContactScreen' component={ContactScreen} options={{ title: 'Contacts' }} />
