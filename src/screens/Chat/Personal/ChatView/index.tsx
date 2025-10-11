@@ -328,7 +328,7 @@ export default function ChatView() {
             await RNFS.writeFile(dest, data, 'base64');
             localPath = dest;
           } catch (err2) {
-            console.warn('Failed to copy picked document to cache', err, err2);
+            // Failed to copy picked document to cache
             Alert.alert(
               'File access error',
               'Unable to access the selected file. Try picking the file again or choose a different file.',

@@ -46,28 +46,25 @@ export default function MediaViewer() {
     closeMenu();
     try {
       const currentItem = items[index];
-      console.log('Preparing to share item:', currentItem);
-      if (!currentItem?.src) {
-        Alert.alert('Error', 'No media to share');
-        return;
-      }
+    //   if (!currentItem?.src) {
+    //     Alert.alert('Error', 'No media to share');
+    //     return;
+    //   }
 
-      // Determine if it's a local file or remote URL
-      const isLocalFile = !currentItem.src.startsWith('http');
-      const fileUri = isLocalFile ? `file://${currentItem.src}` : currentItem.src;
+    //   // Determine if it's a local file or remote URL
+    //   const isLocalFile = !currentItem.src.startsWith('http');
+    //   const fileUri = isLocalFile ? `file://${currentItem.src}` : currentItem.src;
 
-      const shareOptions = {
-        urls: [fileUri], // Use urls array for file sharing
-        type: currentItem.type === 'video' ? 'video/*' : 'image/*',
-        title: 'Share Media',
-        message: 'Check out this media!',
-        failOnCancel: false,
-      };
+    //   const shareOptions = {
+    //     urls: [fileUri], // Use urls array for file sharing
+    //     type: currentItem.type === 'video' ? 'video/*' : 'image/*',
+    //     title: 'Share Media',
+    //     message: 'Check out this media!',
+    //     failOnCancel: false,
+    //   };
 
-      const result = await Share.open(shareOptions);
-      console.log('Share result:', result);
+    //   const result = await Share.open(shareOptions);
     } catch (error) {
-      console.log('Share cancelled or failed:', error);
       // Don't show error for user cancellation
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (
@@ -118,7 +115,6 @@ export default function MediaViewer() {
         [{ text: 'OK' }]
       );
     } catch (error) {
-      console.error('Download error:', error);
       Alert.alert(
         'Download Failed',
         'Could not save media to gallery. Please check permissions.',
@@ -205,7 +201,7 @@ export default function MediaViewer() {
   }, []);
 
   const onTap = useCallback((_: any, itemIndex: number) => {
-    console.log(`Tapped on index ${itemIndex}`);
+    // Handle tap event
   }, []);  const transition = useCallback(stackTransition, []);
 
   return (

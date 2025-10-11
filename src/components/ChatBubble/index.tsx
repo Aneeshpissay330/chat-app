@@ -333,13 +333,13 @@ export default function ChatBubble({
                         fitPolicy={0} // 0 = fit width, 1 = fit height, 2 = fit both
                         spacing={0}
                         onLoadComplete={(numberOfPages) => {
-                          console.log(`PDF loaded with ${numberOfPages} pages`);
+                          // PDF loaded successfully
                         }}
                         onPageChanged={(page) => {
-                          console.log(`Current page: ${page}`);
+                          // Page changed
                         }}
                         onError={(error) => {
-                          console.log('PDF loading error:', error);
+                          // PDF loading error
                         }}
                         renderActivityIndicator={() => (
                           <View style={styles.pdfLoader}>

@@ -64,9 +64,8 @@ export default function AudioFilePlayer({ filePath, onDeleted, autoPlay }: Props
         }
         // strip file:// for RNFS.exists on Android/iOS which accepts both
         const path = sourceUrl.startsWith('file://') ? sourceUrl.replace('file://', '') : sourceUrl;
-        console.log('AudioFilePlayer: checking source', { sourceUrl, path });
+        // Checking if audio file exists
         const ok = await RNFS.exists(path);
-        console.log('AudioFilePlayer: exists?', ok, path);
         if (mounted) setExists(ok);
         if (!ok) setDiagnostic('File not found on device');
         else setDiagnostic(null);
@@ -79,7 +78,7 @@ export default function AudioFilePlayer({ filePath, onDeleted, autoPlay }: Props
   }, [sourceUrl]);
 
   React.useEffect(() => {
-    console.log('AudioFilePlayer: diagnostic', { sourceUrl, exists, diagnostic, duration });
+    // Audio file diagnostic info available
   }, [sourceUrl, exists, diagnostic, duration]);
 
   const [drag, setDrag] = useState<number | null>(null);

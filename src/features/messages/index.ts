@@ -215,14 +215,10 @@ export const startSubscriptions = createAsyncThunk<
             );
             try {
               // eslint-disable-next-line no-console
-              console.debug('downloaded', msg.id, '->', localUri);
+              // Downloaded successfully
             } catch (e) {}
           } catch (err: any) {
-            console.warn(
-              'Message download failed',
-              msg.id,
-              err?.message ?? err,
-            );
+            // Message download failed
             thunkApi.dispatch(
               updateMessage({
                 otherUid,
@@ -232,7 +228,7 @@ export const startSubscriptions = createAsyncThunk<
             );
             try {
               // eslint-disable-next-line no-console
-              console.debug('download failed for', msg.id, err?.message ?? err);
+              // Download failed logging
             } catch (e) {}
           }
 

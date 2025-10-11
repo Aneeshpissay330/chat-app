@@ -30,7 +30,7 @@ export default function GroupChatProfileScreen() {
         description="A collaborative space for our design projects and discussions. Share ideas, feedback, and creative solutions."
         createdAt="Jan 15, 2024"
         membersCount={12}
-        onChangePhoto={() => console.log('Change group photo')}
+        onChangePhoto={() => {}}
       />
 
       <Divider />
@@ -38,9 +38,9 @@ export default function GroupChatProfileScreen() {
       {/* Invite section */}
       <GroupInvite
         inviteLink="https://chat.app/invite/design-team-xyz123"
-        onCopyLink={() => console.log('Copy invite link')}
-        onResetLink={() => console.log('Reset invite link')}
-        onShowQr={() => console.log('Show QR')}
+        onCopyLink={() => {}}
+        onResetLink={() => {}}
+        onShowQr={() => {}}
       />
 
       <Divider />
@@ -70,7 +70,7 @@ export default function GroupChatProfileScreen() {
 
       {/* Leave Group */}
       <View style={{ padding: 16 }}>
-        <Button mode="outlined" textColor={theme.colors.error} onPress={() => console.log('Leave group')}>
+        <Button mode="outlined" textColor={theme.colors.error} onPress={() => {}}>
           Leave Group
         </Button>
       </View>

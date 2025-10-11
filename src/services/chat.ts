@@ -364,7 +364,6 @@ async function sendMediaInternal(
 
     return msgRef.id;
   } catch (error) {
-    console.error('sendMediaInternal error', error);
     // Optional: consider marking a separate field like { uploadError: true }
     // while keeping status as 'pending' so the UI can expose a retry.
   }
@@ -514,7 +513,7 @@ export async function sendImage(
       lastMessageText: '[Photo]',
     });
   } catch (error) {
-    console.error('sendImage error', error);
+    // Handle image send error silently
   }
 }
 
@@ -543,7 +542,7 @@ export async function sendVideo(
       lastMessageText: '[Video]',
     });
   } catch (error) {
-    console.error('sendVideo error', error);
+    // Handle video send error silently
   }
 }
 
@@ -638,7 +637,7 @@ export function subscribeMyChats(
                 avatar = user?.photoURL;
               }
             } catch (e) {
-              console.warn('Failed to fetch user doc for', otherUid, e);
+              // Failed to fetch user doc, using fallback values
             }
           }
 

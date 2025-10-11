@@ -138,7 +138,7 @@ export default function ChatViewGroup() {
 
   const onPickDocument = useCallback(async () => {
     // TODO: integrate a real document picker
-    console.log('Pick document (group)');
+    // Placeholder for document picking functionality
   }, []);
 
   const onOpenCamera = useCallback(async () => {
@@ -148,12 +148,12 @@ export default function ChatViewGroup() {
 
   const onOpenGallery = useCallback(async () => {
     // TODO: integrate gallery picker
-    console.log('Open gallery (group)');
+    // Placeholder for gallery functionality
   }, []);
 
   const onRecordAudio = useCallback(() => {
     // TODO: integrate audio recorder
-    console.log('Record audio (group)');
+    // Placeholder for audio recording functionality
   }, []);
 
   useLayoutEffect(() => {

@@ -42,7 +42,7 @@ export function useSelfChatRow(): ChatRow | null {
           });
         })
         .catch((e) => {
-          console.warn('No self chat found:', e.message);
+          // No self chat found
         });
     }
   }, [userDoc, isFocused]); // 👈 depends on focus

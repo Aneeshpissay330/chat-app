@@ -26,7 +26,7 @@ export function useContactHook() {
         const contacts = await Contacts.getAll();
         return contacts;
       } catch (error) {
-        console.error("Error fetching contacts:", error);
+        // Error fetching contacts
         return [];
       }
     }

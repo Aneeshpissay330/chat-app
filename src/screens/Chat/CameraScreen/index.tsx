@@ -60,7 +60,7 @@ const CameraScreen: React.FC = () => {
   const onPhoto = useCallback(
     async (photo: PhotoFile) => {
       if (!chatId) return;
-      console.log('Photo captured:', photo);
+      // Photo captured, sending to chat
       
       // Fire and forget - don't await, send immediately and go back
       dispatch(sendImageNow({
@@ -72,7 +72,6 @@ const CameraScreen: React.FC = () => {
         size: 0, // You might want to get actual file size
       }));
       
-      console.log('Image send dispatched');
       // Go back immediately without waiting
       navigation.goBack();
     },
@@ -82,7 +81,7 @@ const CameraScreen: React.FC = () => {
   const onVideo = useCallback(
     async (video: VideoFile) => {
       if (!chatId) return;
-      console.log('Video captured:', video);
+      // Video captured, sending to chat
       
       // Fire and forget - don't await, send immediately and go back
       dispatch(sendVideoNow({
@@ -96,7 +95,6 @@ const CameraScreen: React.FC = () => {
           typeof video.duration === 'number' ? video.duration : undefined,
       }));
       
-      console.log('Video send dispatched');
       // Go back immediately without waiting
       navigation.goBack();
     },
@@ -165,7 +163,7 @@ const CameraScreen: React.FC = () => {
       }
       navigation.goBack();
     } catch (error) {
-      console.log('Gallery error or cancelled', error);
+      // Gallery error or cancelled
     }
   }, [chatId, dispatch, navigation]);
 

@@ -197,7 +197,7 @@ export function useAudioPlayer({ audioUrl }: { audioUrl: string }) {
       try {
         await loadAudio();
       } catch (e) {
-        console.warn('Failed to load audio', e);
+        // Failed to load audio
       }
     });
     return () => {

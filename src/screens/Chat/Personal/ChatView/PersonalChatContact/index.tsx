@@ -41,17 +41,17 @@ export default function PersonalChatContact() {
               status="Online" // You can change this if you track presence
               avatarUrl={user.photoURL || ''}
               online
-              onCall={() => console.log('Call')}
-              onVideoCall={() => console.log('Video Call')}
-              onMute={() => console.log('Mute')}
-              onBlock={() => console.log('Block')}
+              onCall={() => {}}
+              onVideoCall={() => {}}
+              onMute={() => {}}
+              onBlock={() => {}}
             />
             <Divider />
             <ContactDetails
               phone={user.phoneNumber || 'N/A'}
               email={user.email || 'N/A'}
-              onPressPhone={() => console.log('Call Number')}
-              onPressEmail={() => console.log('Send Email')}
+              onPressPhone={() => {}}
+              onPressEmail={() => {}}
             />
             <Divider />
           </>
@@ -61,8 +61,8 @@ export default function PersonalChatContact() {
         <Divider />
         <ChatSettings
           notificationsEnabled
-          onToggleNotifications={v => console.log('Notifications:', v)}
-          onClearChat={() => console.log('Clear chat confirmed')}
+          onToggleNotifications={v => {}}
+          onClearChat={() => {}}
         />
       </ScrollView>
     </SafeAreaView>

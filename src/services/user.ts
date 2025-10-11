@@ -31,7 +31,7 @@ export function subscribeUserById(
         onData({ id: snap.id, ...(snap.data() as UserDoc) });
       },
       (err) => {
-        console.error('Error listening to user doc:', err);
+        // Error listening to user doc
         onError?.(err);
       }
     );

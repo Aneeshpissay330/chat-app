@@ -37,16 +37,16 @@ export default function Members() {
           mode="contained"
           containerColor={theme.colors.primary}
           iconColor="white"
-          onPress={() => console.log('Add member')}
+          onPress={() => {}}
         />
       </View>
 
       <ScrollView>
         <GroupMemberList
           members={filteredMembers}
-          onPromote={(id) => console.log('Promote', id)}
-          onDemote={(id) => console.log('Demote', id)}
-          onRemove={(id) => console.log('Remove', id)}
+          onPromote={(id) => {}}
+          onDemote={(id) => {}}
+          onRemove={(id) => {}}
         />
       </ScrollView>
     </View>

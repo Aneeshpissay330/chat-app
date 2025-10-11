@@ -50,11 +50,11 @@ const Settings = () => {
       await signOutGoogle();
       await signOut(getAuth());
     } catch (error) {
-      console.warn('Logout failed:', error);
+      // Logout failed silently
     }
   };
 
-  const open = (what: string) => () => console.log(`Open ${what}`);
+  const open = (what: string) => () => {}; // Placeholder for opening different sections
 
   const title = userDoc?.displayName ?? authUser?.displayName ?? 'Your profile';
   const description =
