@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
-import { IconButton, useTheme } from 'react-native-paper';
+import { IconButton, useTheme, Menu } from 'react-native-paper';
 
 type MediaItem = { src: string; type: 'image' | 'video' };
 
@@ -29,13 +29,33 @@ export default function MediaViewer() {
   const title = route.params?.title ?? '';
 
   const [index, setIndex] = useState(Math.min(Math.max(0, initial), Math.max(0, items.length - 1)));
+  const [menuVisible, setMenuVisible] = useState(false);
   const listRef = useRef<FlatList<any> | null>(null);
+
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+
+  const handleShare = () => {
+    closeMenu();
+    // Add share functionality here
+  };
+
+  const handleDownload = () => {
+    closeMenu();
+    // Add download functionality here
+  };
+
+  const handleDelete = () => {
+    closeMenu();
+    // Add delete functionality here
+  };
 
   useEffect(() => {
     navigation.setOptions({
       headerShown: true,
       headerTitle: title,
       headerBackVisible: true,
+      headerShadowVisible: false,
       headerStyle: {
         backgroundColor: theme.colors.background,
       },
@@ -44,12 +64,38 @@ export default function MediaViewer() {
       },
       headerTintColor: theme.colors.onBackground,
       headerRight: () => (
-        <Text style={{ color: theme.colors.onBackground, opacity: 0.7, fontSize: 12, marginRight: 16 }}>
-          {index + 1} of {items.length}
-        </Text>
+        <Menu
+          visible={menuVisible}
+          onDismiss={closeMenu}
+          anchor={
+            <IconButton
+              icon="dots-vertical"
+              size={24}
+              iconColor={theme.colors.onBackground}
+              onPress={openMenu}
+            />
+          }
+          anchorPosition="bottom"
+        >
+          <Menu.Item
+            leadingIcon="share-variant"
+            onPress={handleShare}
+            title="Share"
+          />
+          <Menu.Item
+            leadingIcon="download"
+            onPress={handleDownload}
+            title="Download"
+          />
+          <Menu.Item
+            leadingIcon="trash-can"
+            onPress={handleDelete}
+            title="Delete"
+          />
+        </Menu>
       ),
     });
-  }, [navigation, title, index, items.length, theme.colors.background, theme.colors.onBackground]);
+  }, [navigation, title, menuVisible, theme.colors.background, theme.colors.onBackground, openMenu, closeMenu, handleShare, handleDownload, handleDelete]);
 
   const onViewRef = useRef((info: { viewableItems: ViewToken[] }) => {
     if (info.viewableItems && info.viewableItems.length > 0) {
@@ -84,10 +130,10 @@ export default function MediaViewer() {
         style={{ flex: 1 }}
       />
 
-      <View style={styles.bottomBar}>
-        <IconButton icon="share-variant" onPress={() => {}} />
-        <IconButton icon="download" onPress={() => {}} />
-        <IconButton icon="trash-can" onPress={() => {}} />
+      <View style={styles.paginationOverlay}>
+        <Text style={styles.paginationText}>
+          {index + 1} of {items.length}
+        </Text>
       </View>
     </View>
   );
@@ -99,13 +145,33 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600' },
   mediaContainer: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   mediaWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  media: { width: width, height: height - 160 }, // Adjusted height to account for header
+  media: { width: width, height: height - 100 }, // Adjusted height to account for header only
   navHit: { width: 64, height: '100%' },
-  bottomBar: {
-    height: 84,
-    paddingBottom: 18,
-    flexDirection: 'row',
+  paginationOverlay: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  paginationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    color: 'white',
+    textAlign: 'center',
+    minWidth: 60,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
