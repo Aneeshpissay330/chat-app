@@ -2,22 +2,23 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   StyleSheet,
-  Image,
-  Dimensions,
-  TouchableOpacity,
   Text,
   Platform,
-  FlatList,
-  ViewToken,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Video from 'react-native-video';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { IconButton, useTheme, Menu } from 'react-native-paper';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { handleStoragePermission } from '../../../permission';
 import Share from 'react-native-share';
+import {
+  stackTransition,
+  Gallery,
+  type GalleryRefType,
+} from 'react-native-zoom-toolkit';
+import GalleryImage from './GalleryImage';
+import GalleryVideo from './GalleryVideo';
 
 type MediaItem = { src: string; type: 'image' | 'video' };
 
@@ -36,7 +37,7 @@ export default function MediaViewer() {
 
   const [index, setIndex] = useState(Math.min(Math.max(0, initial), Math.max(0, items.length - 1)));
   const [menuVisible, setMenuVisible] = useState(false);
-  const listRef = useRef<FlatList<any> | null>(null);
+  const galleryRef = useRef<GalleryRefType>(null);
 
   const openMenu = () => setMenuVisible(true);
   const closeMenu = () => setMenuVisible(false);
@@ -187,39 +188,37 @@ export default function MediaViewer() {
     });
   }, [navigation, title, menuVisible, theme.colors.background, theme.colors.onBackground, openMenu, closeMenu, handleShare, handleDownload, handleDelete]);
 
-  const onViewRef = useRef((info: { viewableItems: ViewToken[] }) => {
-    if (info.viewableItems && info.viewableItems.length > 0) {
-      const idx = info.viewableItems[0].index ?? 0;
-      setIndex(idx);
-    }
-  });
-
-  const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
-
-  const renderItem = useCallback(({ item }: { item: MediaItem }) => {
-    const mediaHeight = height - 100 - Math.max(insets.bottom, 20); // Account for header and bottom safe area
-    
+  // Gallery callback functions
+  const renderItem = useCallback((item: MediaItem, itemIndex: number) => {
     if (item.type === 'image') {
-      return <Image source={{ uri: item.src }} style={[styles.media, { height: mediaHeight }]} resizeMode="contain" />;
+      return <GalleryImage uri={item.src} index={itemIndex} />;
     }
-    return <Video source={{ uri: item.src }} style={[styles.media, { height: mediaHeight }]} controls resizeMode="contain" />;
-  }, [insets.bottom]);
+    return <GalleryVideo uri={item.src} index={itemIndex} />;
+  }, []);
+
+  const keyExtractor = useCallback((item: MediaItem, itemIndex: number) => {
+    return `${item.src}-${itemIndex}`;
+  }, []);
+
+  const onIndexChange = useCallback((newIndex: number) => {
+    setIndex(newIndex);
+  }, []);
+
+  const onTap = useCallback((_: any, itemIndex: number) => {
+    console.log(`Tapped on index ${itemIndex}`);
+  }, []);  const transition = useCallback(stackTransition, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <FlatList
-        ref={listRef}
+      <Gallery
+        ref={galleryRef}
         data={items}
-        horizontal
-        pagingEnabled
-        initialScrollIndex={index}
-        getItemLayout={(_, i) => ({ length: Dimensions.get('window').width, offset: Dimensions.get('window').width * i, index: i })}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
-        keyExtractor={(_, i) => String(i)}
-        onViewableItemsChanged={onViewRef.current}
-        viewabilityConfig={viewConfigRef.current}
-        showsHorizontalScrollIndicator={false}
-        style={{ flex: 1 }}
+        onTap={onTap}
+        onIndexChange={onIndexChange}
+        initialIndex={index}
+        customTransition={transition}
       />
 
       <View style={[styles.paginationOverlay, { bottom: Math.max(insets.bottom + 10, 30) }]}>
@@ -231,14 +230,8 @@ export default function MediaViewer() {
   );
 }
 
-const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '600' },
-  mediaContainer: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  mediaWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  media: { width: width }, // Removed fixed height, now calculated dynamically
-  navHit: { width: 64, height: '100%' },
   paginationOverlay: {
     position: 'absolute',
     left: 0,
