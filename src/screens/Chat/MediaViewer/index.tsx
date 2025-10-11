@@ -9,10 +9,14 @@ import {
   Platform,
   FlatList,
   ViewToken,
+  Alert,
 } from 'react-native';
 import Video from 'react-native-video';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { IconButton, useTheme, Menu } from 'react-native-paper';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import { handleStoragePermission } from '../../../permission';
+import Share from 'react-native-share';
 
 type MediaItem = { src: string; type: 'image' | 'video' };
 
@@ -35,14 +39,88 @@ export default function MediaViewer() {
   const openMenu = () => setMenuVisible(true);
   const closeMenu = () => setMenuVisible(false);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     closeMenu();
-    // Add share functionality here
+    try {
+      const currentItem = items[index];
+      if (!currentItem?.src) {
+        Alert.alert('Error', 'No media to share');
+        return;
+      }
+
+      // Determine if it's a local file or remote URL
+      const isLocalFile = !currentItem.src.startsWith('http');
+      const fileUri = isLocalFile ? `file://${currentItem.src}` : currentItem.src;
+
+      const shareOptions = {
+        urls: [fileUri], // Use urls array for file sharing
+        type: currentItem.type === 'video' ? 'video/*' : 'image/*',
+        title: 'Share Media',
+        message: 'Check out this media!',
+        failOnCancel: false,
+      };
+
+      const result = await Share.open(shareOptions);
+      console.log('Share result:', result);
+    } catch (error) {
+      console.log('Share cancelled or failed:', error);
+      // Don't show error for user cancellation
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage !== 'User did not share' && 
+        !errorMessage.includes('cancelled') &&
+        !errorMessage.includes('dismiss')
+      ) {
+        Alert.alert('Share Failed', 'Could not share media. Please try again.');
+      }
+    }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     closeMenu();
-    // Add download functionality here
+    try {
+      const currentItem = items[index];
+      if (!currentItem?.src) {
+        Alert.alert('Error', 'No media to download');
+        return;
+      }
+
+      // Check storage permission first
+      const permissionStatus = await handleStoragePermission('check');
+      
+      if (permissionStatus !== 'granted') {
+        // Request permission if not granted
+        const requestResult = await handleStoragePermission('request');
+        
+        if (requestResult !== 'granted') {
+          Alert.alert(
+            'Permission Required',
+            'Storage permission is required to save media to your gallery. Please grant permission in settings.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
+      // Save to camera roll
+      await CameraRoll.saveAsset(currentItem.src, {
+        type: currentItem.type === 'video' ? 'video' : 'photo',
+        album: 'ChatApp', // Optional: create custom album
+      });
+
+      Alert.alert(
+        'Success',
+        `${currentItem.type === 'video' ? 'Video' : 'Image'} saved to gallery!`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert(
+        'Download Failed',
+        'Could not save media to gallery. Please check permissions.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleDelete = () => {
@@ -76,21 +154,30 @@ export default function MediaViewer() {
             />
           }
           anchorPosition="bottom"
+          contentStyle={{
+            backgroundColor: theme.colors.surface,
+          }}
         >
           <Menu.Item
             leadingIcon="share-variant"
             onPress={handleShare}
             title="Share"
+            titleStyle={{ color: theme.colors.onSurface }}
+            style={{ backgroundColor: theme.colors.surface }}
           />
           <Menu.Item
             leadingIcon="download"
             onPress={handleDownload}
             title="Download"
+            titleStyle={{ color: theme.colors.onSurface }}
+            style={{ backgroundColor: theme.colors.surface }}
           />
           <Menu.Item
             leadingIcon="trash-can"
             onPress={handleDelete}
             title="Delete"
+            titleStyle={{ color: theme.colors.onSurface }}
+            style={{ backgroundColor: theme.colors.surface }}
           />
         </Menu>
       ),
